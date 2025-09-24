@@ -80,7 +80,7 @@ export default function HomePage() {
 
       {/* Hero Section - two column professional layout */}
       <section className="relative min-h-screen flex items-center">
-        <div className="absolute inset-0 bg-black" />
+        <div className="absolute p-0 inset-0 bg-black" />
         <div className="container mx-auto px-6 z-10 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-24">
             {/* Left: Headline + CTAs */}
