@@ -12,6 +12,7 @@ import {
   IconSettings,
   IconUserFilled,
 } from "@tabler/icons-react";
+import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -90,7 +91,7 @@ export default function HomePage() {
       <div className="pt-4 px-4">
         <FloatingDock
           items={navigationItems}
-          desktopClassName="fixed top-8 left-1/2 -translate-x-1/2 z-50"
+          desktopClassName="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
           mobileClassName="fixed top-4 right-4 z-50"
         />
       </div>
@@ -288,6 +289,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer spacing */}
+      <Footer/>
       <div className="h-24" />
     </main>
   );
