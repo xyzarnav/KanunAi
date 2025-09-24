@@ -2,30 +2,47 @@
 
 import Image from "next/image";
 import { FloatingDock } from "@/components/ui/floating-dock";
-import { IconBook, IconGavel, IconHome, IconScale } from "@tabler/icons-react";
+import {
+  IconBook,
+  IconGavel,
+  IconHome,
+  IconScale,
+  IconId,
+  IconMoodSmile,
+  IconSettings,
+  IconUserFilled,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 
 export default function HomePage() {
   const navigationItems = [
     {
       title: "Home",
-      icon: <IconHome className="text-neutral-500 dark:text-neutral-400" />,
+      icon: <IconHome className="text-neutral-200 dark:text-neutral-400" />,
       href: "/",
     },
     {
       title: "Legal Analysis",
-      icon: <IconScale className="text-neutral-500 dark:text-neutral-400" />,
+      icon: <IconScale className="text-neutral-200 dark:text-neutral-400" />,
       href: "/analysis",
     },
     {
       title: "Case Law",
-      icon: <IconGavel className="text-neutral-500 dark:text-neutral-400" />,
+      icon: <IconGavel className="text-neutral-200 dark:text-neutral-400" />,
       href: "/cases",
     },
     {
       title: "Resources",
-      icon: <IconBook className="text-neutral-500 dark:text-neutral-400" />,
+      icon: <IconBook className="text-neutral-200 dark:text-neutral-900" />,
+      href: "/resources",
+    },
+    {
+      title: "Profile",
+      icon: (
+        <IconUserFilled className="text-neutral-200 dark:text-neutral-900" />
+      ),
       href: "/resources",
     },
   ];
