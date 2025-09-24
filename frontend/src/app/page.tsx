@@ -88,17 +88,17 @@ export default function HomePage() {
       `}</style>
 
       {/* Existing navbar */}
-      <div className="pt-4 px-4">
+      <div className="pt-8 px-4 py-2">
         <FloatingDock
           items={navigationItems}
-          desktopClassName="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
-          mobileClassName="fixed top-4 right-4 z-50"
+          desktopClassName="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
+          mobileClassName="fixed top-8 right-4 z-50"
         />
       </div>
 
       {/* Hero Section - two column professional layout */}
       <section className="relative min-h-screen flex items-center">
-        <div className="absolute p-0 inset-0 bg-black" />
+        <div className="absolute p-2 inset-0 bg-black" />
         <div className="container mx-auto px-6 z-10 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-24">
             {/* Left: Headline + CTAs */}
@@ -130,7 +130,7 @@ export default function HomePage() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="border-slate-700 text-slate-200 hover:border-[var(--accent-gold)]"
+                  className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
                 >
                   Explore Datasets
                 </Button>
@@ -151,7 +151,7 @@ export default function HomePage() {
             {/* Right: Visual card with subtle illustration */}
             <div className="flex justify-center">
               <Card className="w-full max-w-md bg-gradient-to-br from-slate-900/60 to-slate-950/60 border border-slate-800/40 shadow-lg">
-                <CardHeader className="p-6">
+                <CardHeader className="p-3">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-md flex items-center justify-center bg-[var(--accent-gold)]/10 border border-[var(--accent-gold)]/20">
                       <IconScale className="w-6 h-6 text-[var(--accent-gold)]" />
