@@ -73,7 +73,7 @@ export default function HomePage() {
       <div className="pt-4 px-4">
         <FloatingDock
           items={navigationItems}
-          desktopClassName="fixed top-4 left-1/2 -translate-x-1/2 z-50"
+          desktopClassName="fixed top-8 left-1/2 -translate-x-1/2 z-50"
           mobileClassName="fixed top-4 right-4 z-50"
         />
       </div>
