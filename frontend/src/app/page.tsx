@@ -1,6 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import { FloatingDock } from "@/components/ui/floating-dock";
 import { IconBook, IconGavel, IconHome, IconScale } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function HomePage() {
   const navigationItems = [
@@ -26,8 +30,45 @@ export default function HomePage() {
     },
   ];
 
+  // New: feature and stat data with icon component references (not JSX elements)
+  const features = [
+    {
+      icon: IconScale,
+      title: "Legal Analysis",
+      description:
+        "AI-driven insights that interpret statutes and case law with contextual accuracy.",
+    },
+    {
+      icon: IconGavel,
+      title: "Case Research",
+      description:
+        "Fast, authoritative retrieval of Indian precedents and judicial reasoning.",
+    },
+    {
+      icon: IconBook,
+      title: "Statutory Intelligence",
+      description:
+        "Structured access to statutes, rules and regulatory frameworks for confident decision-making.",
+    },
+  ];
+
+  const stats = [
+    { value: "2M+", label: "Documents" },
+    { value: "75K+", label: "Precedents" },
+    { value: "24/7", label: "AI Support" },
+    { value: "99.7%", label: "Reliability" },
+  ];
+
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white overflow-x-hidden">
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        :root{
+          --accent-gold: #D4AF37;
+          --accent-deep: #0b2340;
+        }
+      `}</style>
+
       {/* Existing navbar */}
       <div className="pt-4 px-4">
         <FloatingDock
@@ -37,89 +78,200 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 to-black z-0" />
-        <div className="container mx-auto px-4 z-10">
-          <div className="flex flex-col items-center justify-center space-y-8 text-center">
-            <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-              IndianLaw AI
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl">
-              Revolutionizing legal research with artificial intelligence. Access,
-              analyze, and understand Indian law like never before.
+      {/* Hero Section - two column professional layout */}
+      <section className="relative min-h-screen flex items-center">
+        <div className="absolute inset-0 bg-black" />
+        <div className="container mx-auto px-6 z-10 max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-24">
+            {/* Left: Headline + CTAs */}
+            <div className="space-y-8">
+              <div className="text-sm text-slate-400 uppercase tracking-wider">
+                Introducing
+              </div>
+              <h1 className="font-serif text-5xl md:text-6xl leading-tight">
+                Kanun AI
+                <span className="block text-slate-300 text-3xl font-light mt-2">
+                  Indian Law, amplified by intelligence
+                </span>
+              </h1>
+
+              <p className="text-slate-400 max-w-xl leading-relaxed">
+                Trusted legal intelligence tailored for the Indian jurisdiction.
+                Rapid research, concise analysis, and dependable insights — designed
+                for practitioners and scholars.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
+                >
+                  Start a Case Analysis
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="border-slate-700 text-slate-200 hover:border-[var(--accent-gold)]"
+                >
+                  Explore Datasets
+                </Button>
+              </div>
+
+              <div className="flex gap-8 mt-6">
+                {stats.map((s, i) => (
+                  <div key={i} className="text-center">
+                    <div className="font-serif text-2xl text-[var(--accent-gold)] font-bold">
+                      {s.value}
+                    </div>
+                    <div className="text-sm text-slate-400">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Visual card with subtle illustration */}
+            <div className="flex justify-center">
+              <Card className="w-full max-w-md bg-gradient-to-br from-slate-900/60 to-slate-950/60 border border-slate-800/40 shadow-lg">
+                <CardHeader className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-md flex items-center justify-center bg-[var(--accent-gold)]/10 border border-[var(--accent-gold)]/20">
+                      <IconScale className="w-6 h-6 text-[var(--accent-gold)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="font-serif text-lg text-white">
+                        AI-assisted Briefing
+                      </CardTitle>
+                      <div className="text-xs text-slate-400">
+                        Summarize judgments in seconds
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 pt-0">
+                  <div className="rounded-md bg-gradient-to-b from-[var(--accent-deep)]/30 to-transparent p-4">
+                    {/* Minimal circuit + scales SVG */}
+                    <svg
+                      viewBox="0 0 240 120"
+                      className="w-full h-40"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <defs>
+                        <linearGradient id="g1" x1="0" x2="1">
+                          <stop
+                            offset="0"
+                            stopColor="#D4AF37"
+                            stopOpacity="0.8"
+                          />
+                          <stop
+                            offset="1"
+                            stopColor="#60A5FA"
+                            stopOpacity="0.8"
+                          />
+                        </linearGradient>
+                      </defs>
+                      <rect
+                        x="6"
+                        y="6"
+                        width="228"
+                        height="108"
+                        rx="8"
+                        stroke="rgba(212,175,55,0.08)"
+                      />
+                      <g
+                        stroke="url(#g1)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity="0.95"
+                      >
+                        <path d="M30 80 V40 H60" />
+                        <path d="M60 40 H90" />
+                        <circle cx="100" cy="48" r="3" />
+                        <path d="M120 30 V80" />
+                        <path d="M140 40 H180" />
+                        <path d="M180 40 V70" />
+                        <path d="M170 60 Q160 68 150 60" />
+                        <path d="M60 70 Q80 60 100 70" />
+                      </g>
+                      <g
+                        transform="translate(40,10)"
+                        fill="none"
+                        stroke="rgba(212,175,55,0.9)"
+                        strokeLinecap="round"
+                      >
+                        <path d="M120 50 L140 50" strokeWidth="2" />
+                        <path d="M130 40 L130 60" strokeWidth="2" />
+                      </g>
+                    </svg>
+                  </div>
+
+                  <p className="text-slate-300 mt-4">
+                    Concise digests, argument maps, and precedent links — all
+                    generated and verified for relevance.
+                  </p>
+
+                  <div className="mt-6 flex gap-3">
+                    <Button
+                      size="sm"
+                      className="bg-[var(--accent-gold)]/90 text-black"
+                    >
+                      Try Demo
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-300"
+                    >
+                      Request Access
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section - clean cards */}
+      <section className="py-20">
+        <div className="container mx-auto px-6 max-w-6xl">
+          <div className="text-center mb-12">
+            <h2 className="font-serif text-3xl md:text-4xl">Capabilities</h2>
+            <p className="text-slate-400 mt-3">
+              Focused tools for legal professionals and institutions.
             </p>
-            <div className="flex gap-4 mt-8">
-              <button className="px-8 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors">
-                Get Started
-              </button>
-              <button className="px-8 py-3 border border-purple-600 rounded-lg font-medium hover:bg-purple-600/10 transition-colors">
-                Learn More
-              </button>
-            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {features.map((f, idx) => {
+              const IconComp = f.icon;
+              return (
+                <Card
+                  key={idx}
+                  className="p-6 bg-slate-900/40 border border-slate-800/40 hover:translate-y-[-4px] transition-transform"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-[var(--accent-gold)]/10 flex items-center justify-center border border-[var(--accent-gold)]/20">
+                      <IconComp className="w-6 h-6 text-[var(--accent-gold)]" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg">{f.title}</h3>
+                      <p className="text-slate-400 mt-2 text-sm">
+                        {f.description}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-black/50">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 rounded-xl bg-neutral-900/50 backdrop-blur-sm">
-              <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mb-4">
-                <IconScale className="w-6 h-6 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Legal Analysis</h3>
-              <p className="text-gray-400">
-                Advanced AI-powered analysis of legal documents and case laws.
-              </p>
-            </div>
-            <div className="p-6 rounded-xl bg-neutral-900/50 backdrop-blur-sm">
-              <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mb-4">
-                <IconGavel className="w-6 h-6 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Case Research</h3>
-              <p className="text-gray-400">
-                Comprehensive database of Indian court judgments and precedents.
-              </p>
-            </div>
-            <div className="p-6 rounded-xl bg-neutral-900/50 backdrop-blur-sm">
-              <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mb-4">
-                <IconBook className="w-6 h-6 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Legal Resources</h3>
-              <p className="text-gray-400">
-                Access to statutes, regulations, and legal documentation.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 border-t border-neutral-800">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <h4 className="text-4xl font-bold text-purple-400">1M+</h4>
-              <p className="text-gray-400 mt-2">Legal Documents</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-purple-400">50K+</h4>
-              <p className="text-gray-400 mt-2">Case Laws</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-purple-400">24/7</h4>
-              <p className="text-gray-400 mt-2">AI Assistance</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-purple-400">99%</h4>
-              <p className="text-gray-400 mt-2">Accuracy Rate</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Footer spacing */}
+      <div className="h-24" />
     </main>
   );
 }
-        
