@@ -1,53 +1,120 @@
 "use client";
 
 import Link from 'next/link';
+import { FloatingDock } from "@/components/ui/floating-dock";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  IconBook,
+  IconGavel,
+  IconHome,
+  IconScale,
+  IconId,
+  IconMoodSmile,
+  IconSettings,
+  IconUserFilled,
+  IconLogin,
+} from "@tabler/icons-react";
 
 export default function LoginPage() {
+  const navigationItems = [
+    {
+      title: "Home",
+      icon: <IconHome className="text-neutral-200 dark:text-neutral-400" />,
+      href: "/",
+    },
+    {
+      title: "Legal Analysis",
+      icon: <IconScale className="text-neutral-200 dark:text-neutral-400" />,
+      href: "/analysis",
+    },
+    {
+      title: "Case Law",
+      icon: <IconGavel className="text-neutral-200 dark:text-neutral-400" />,
+      href: "/cases",
+    },
+    {
+      title: "Resources",
+      icon: <IconBook className="text-neutral-200 dark:text-neutral-900" />,
+      href: "/resources",
+    },
+    {
+      title: "Login",
+      icon: <IconLogin className="text-neutral-200 dark:text-neutral-400" />,
+      href: "/login",
+    },
+  ];
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-6">
-      {/* Centered card with chalky border */}
-      <div className="relative w-full max-w-lg">
-        {/* SVG overlay that creates a rough chalk-like white border */}
-        <svg
-          className="pointer-events-none absolute inset-0 w-full h-full"
-          viewBox="0 0 800 600"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <defs>
-            <filter id="grain" x="-20%" y="-20%" width="140%" height="140%">
-              <feTurbulence baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="noise" />
-              <feColorMatrix type="saturate" values="0" />
-              <feBlend in="SourceGraphic" in2="noise" mode="overlay" />
-            </filter>
-          </defs>
-          <rect x="8" y="8" width="784" height="584" fill="none" stroke="#ffffff" strokeWidth={16} strokeLinejoin="round" filter="url(#grain)" rx="12" ry="12" />
-        </svg>
+    <main className="min-h-screen bg-black text-white overflow-x-hidden">
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        :root{
+          --accent-gold: #D4AF37;
+          --accent-deep: #0b2340;
+        }
+      `}</style>
 
-        <section className="relative bg-white/95 backdrop-blur-sm rounded-md shadow-xl px-8 py-10 border border-transparent">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold text-gray-900">Sign in</h1>
-            <p className="mt-2 text-sm text-gray-600">Authenticate with Auth0 to continue</p>
-          </div>
+      {/* Navigation */}
+      <div className="pt-8 px-4 py-2">
+        <FloatingDock
+          items={navigationItems}
+          desktopClassName="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
+          mobileClassName="fixed top-8 right-4 z-50"
+        />
+      </div>
 
-          <div className="mt-8 space-y-4">
-            <button
-              onClick={() => (window.location.href = '/api/auth/login')}
-              className="w-full inline-flex items-center justify-center gap-3 py-3 px-4 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition"
-            >
-              {/* Simple icon placeholder */}
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 opacity-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                <path fillRule="evenodd" d="M10 2a4 4 0 100 8 4 4 0 000-8zM2 18a8 8 0 1116 0H2z" clipRule="evenodd" />
-              </svg>
-              Sign in with Auth0
-            </button>
+      {/* Login Section */}
+      <section className="relative min-h-screen flex items-center">
+        <div className="absolute p-2 inset-0 bg-black" />
+        <div className="container mx-auto px-6 z-10 max-w-7xl">
+          <div className="flex items-center justify-center">
+            <div className="w-full max-w-md">
+              <Card className="bg-gradient-to-br border border-slate-800/40 shadow-lg">
+                <CardHeader className="text-center pb-4">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-lg bg-[var(--accent-gold)]/10 flex items-center justify-center border border-[var(--accent-gold)]/20">
+                      <IconScale className="w-8 h-8 text-[var(--accent-gold)]" />
+                    </div>
+                  </div>
+                  <CardTitle className="font-serif text-2xl text-white">
+                    Welcome to Kanun AI
+                  </CardTitle>
+                  <p className="text-slate-400 mt-2">
+                    Sign in to access legal intelligence
+                  </p>
+                </CardHeader>
+                
+                <CardContent className="space-y-6">
+                  <Button
+                    onClick={() => (window.location.href = '/api/auth/login')}
+                    className="w-full bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform font-medium py-3"
+                    size="lg"
+                  >
+                    <IconLogin className="w-5 h-5 mr-2" />
+                    Sign in with Auth0
+                  </Button>
 
-            <div className="flex items-center justify-center">
-              <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-500">← Back to Home</Link>
+                  <div className="text-center">
+                    <Link 
+                      href="/" 
+                      className="text-sm text-slate-400 hover:text-[var(--accent-gold)] transition-colors"
+                    >
+                      ← Back to Home
+                    </Link>
+                  </div>
+
+                  <div className="border-t border-slate-700 pt-4">
+                    <p className="text-xs text-slate-500 text-center">
+                      Secure authentication powered by Auth0
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

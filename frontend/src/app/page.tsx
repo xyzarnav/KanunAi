@@ -151,7 +151,7 @@ export default function HomePage() {
                   <Button
                     variant="outline"
                     size="lg"
-                    className="border-slate-700 text-slate-300 font-bold hover:border-[var(--accent-gold)]"
+                    className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
                   >
                     Complete Signup
                   </Button>
