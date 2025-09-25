@@ -11,7 +11,7 @@ export interface IUser extends Document {
 
 const UserSchema: Schema = new Schema({
   auth0Id: {
-    type: String,
+    type: String,   
     required: true,
     unique: true,
   },

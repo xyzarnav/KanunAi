@@ -15,6 +15,8 @@ import {
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AuthButton from "@/components/AuthButton";
+import Link from "next/link";
 
 
 export default function HomePage() {
@@ -96,6 +98,11 @@ export default function HomePage() {
         />
       </div>
 
+      {/* Auth Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <AuthButton />
+      </div>
+
       {/* Hero Section - two column professional layout */}
       <section className="relative min-h-screen flex items-center">
         <div className="absolute p-2 inset-0 bg-black" />
@@ -120,20 +127,24 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
-                >
-                  Start a Case Analysis
-                </Button>
+                <Link href="/analysis">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
+                  >
+                    Start a Case Analysis
+                  </Button>
+                </Link>
 
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
-                >
-                  Explore Datasets
-                </Button>
+                <Link href="/signup">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="border-slate-700 text-slate-300 font-bold hover:border-[var(--accent-gold)]"
+                  >
+                    Complete Signup
+                  </Button>
+                </Link>
               </div>
 
               <div className="flex gap-8 mt-6">

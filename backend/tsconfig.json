@@ -7,8 +7,10 @@
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "commonjs",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "target": "ES2020",
+    "allowSyntheticDefaultImports": true,
     "lib": ["ES2020"],
     "types": [],
     // For nodejs:
