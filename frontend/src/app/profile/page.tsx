@@ -4,8 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { IconCopy } from '@tabler/icons-react';
+import { IconCopy, IconScale } from '@tabler/icons-react';
 import { useState } from 'react';
+import Loading from '@/components/ui/loading';
 
 export default function ProfilePage() {
   const { user, error, isLoading } = useAuth();
@@ -30,14 +31,7 @@ export default function ProfilePage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-          <p className="mt-4 text-lg">Loading...</p>
-        </div>
-      </div>
-    );
+    return <Loading message="Loading your profile..." />;
   }
 
   if (error) {

@@ -2,13 +2,14 @@
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import Loading from './ui/loading';
 
 export default function AuthButton() {
   const { user, error, isLoading } = useAuth();
 
   console.log('AuthButton - user:', user, 'error:', error, 'isLoading:', isLoading);
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <Loading message="Loading..." size="sm" />;
   if (error) return <div>Error: {error.message}</div>;
 
   if (user) {
