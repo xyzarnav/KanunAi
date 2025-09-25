@@ -11,15 +11,19 @@ import {
   IconMoodSmile,
   IconSettings,
   IconUserFilled,
+  IconLogin,
 } from "@tabler/icons-react";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthButton from "@/components/AuthButton";
+import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 
 
 export default function HomePage() {
+  const { user, isLoading } = useAuth();
+
   const navigationItems = [
     {
       title: "Home",
@@ -41,13 +45,20 @@ export default function HomePage() {
       icon: <IconBook className="text-neutral-200 dark:text-neutral-900" />,
       href: "/resources",
     },
-    {
-      title: "Profile",
-      icon: (
-        <IconUserFilled className="text-neutral-200 dark:text-neutral-900" />
-      ),
-      href: "/resources",
-    },
+    // Show different icons based on authentication state
+    ...(user ? [
+      {
+        title: "Profile",
+        icon: <IconUserFilled className="text-neutral-200 dark:text-neutral-900" />,
+        href: "/profile",
+      }
+    ] : [
+      {
+        title: "Login",
+        icon: <IconLogin className="text-neutral-200 dark:text-neutral-400" />,
+        href: "/login",
+      }
+    ]),
   ];
 
   // New: feature and stat data with icon component references (not JSX elements)
@@ -98,10 +109,10 @@ export default function HomePage() {
         />
       </div>
 
-      {/* Auth Button */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Auth Button - Commented out as requested */}
+      {/* <div className="fixed top-4 right-4 z-50">
         <AuthButton />
-      </div>
+      </div> */}
 
       {/* Hero Section - two column professional layout */}
       <section className="relative min-h-screen flex items-center">

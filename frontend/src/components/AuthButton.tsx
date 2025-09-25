@@ -1,13 +1,15 @@
 'use client';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function AuthButton() {
-  const { user, error, isLoading } = useUser();
+  const { user, error, isLoading } = useAuth();
+
+  console.log('AuthButton - user:', user, 'error:', error, 'isLoading:', isLoading);
 
   if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>{error.message}</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
   if (user) {
     return (
@@ -24,8 +26,10 @@ export default function AuthButton() {
 
   return (
     <Link href="/api/auth/login">
-      <Button className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform">
-        Login
+      {/* <Button className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"> */}
+       
+      <Button className='bg-none' >
+        {/* Login */}
       </Button>
     </Link>
   );

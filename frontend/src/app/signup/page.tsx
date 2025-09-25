@@ -1,5 +1,5 @@
 'use client';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { useUser } from '@auth0/nextjs-auth0';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,16 @@ export default function SignupPage() {
   };
 
   if (isLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
-  if (!user) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Please login first</div>;
+  if (!user) return (
+    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl mb-4">Please login first</h1>
+        <a href="/api/auth/login" className="bg-blue-500 text-white px-4 py-2 rounded">
+          Login with Auth0
+        </a>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
