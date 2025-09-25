@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 
-// import {connectToDatabse} from './config/debugger.config' ;
+// import {connectToDatabse} from './config/db.config' ;
 // import {errorMiddleware} from './middleware/error.middleware';
 // import apiRoutes from './api' ;
 
