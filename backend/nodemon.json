@@ -1,0 +1,8 @@
+{
+  "exec": "tsx src/server.ts",
+  "ext": "ts,js,json",
+  "ignore": ["node_modules", "dist"],
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

@@ -11,13 +11,21 @@ import {
   IconMoodSmile,
   IconSettings,
   IconUserFilled,
+  IconLogin,
+  IconLogout,
 } from "@tabler/icons-react";
 import { Footer } from "@/components/ui/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAppSelector } from "@/store/hooks";
+import Link from "next/link";
 
 
 export default function HomePage() {
+  const { logout } = useAuth();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
   const navigationItems = [
     {
       title: "Home",
@@ -40,12 +48,25 @@ export default function HomePage() {
       href: "/resources",
     },
     {
-      title: "Profile",
-      icon: (
-        <IconUserFilled className="text-neutral-200 dark:text-neutral-900" />
+      title: isAuthenticated ? `Profile (${user?.name})` : "Login",
+      icon: isAuthenticated ? (
+        <div className="relative">
+          <IconUserFilled className="text-neutral-200 dark:text-neutral-900" />
+          <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border border-neutral-800 ${
+            user?.role === 'lawyer' ? 'bg-blue-500' : 'bg-green-500'
+          }`}></div>
+        </div>
+      ) : (
+        <IconLogin className="text-neutral-200 dark:text-neutral-900" />
       ),
-      href: "/resources",
+      href: isAuthenticated ? "/profile" : "/login",
     },
+    ...(isAuthenticated ? [{
+      title: "Logout",
+      icon: <IconLogout className="text-red-400" />,
+      href: "#",
+      onClick: logout,
+    }] : []),
   ];
 
   // New: feature and stat data with icon component references (not JSX elements)
@@ -103,9 +124,15 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-24">
             {/* Left: Headline + CTAs */}
             <div className="space-y-8">
-              <div className="text-sm text-slate-400 uppercase tracking-wider">
-                Introducing
-              </div>
+              {isAuthenticated ? (
+                <div className="text-sm text-slate-400 uppercase tracking-wider">
+                  Welcome back, {user?.name}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-400 uppercase tracking-wider">
+                  Introducing
+                </div>
+              )}
               <h1 className="font-serif text-5xl md:text-6xl leading-tight">
                 Kanun AI
                 <span className="block text-slate-300 text-3xl font-light mt-2">
@@ -120,20 +147,43 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
-                >
-                  Start a Case Analysis
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
-                >
-                  Explore Datasets
-                </Button>
+                {isAuthenticated ? (
+                  <>
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
+                    >
+                      Start a Case Analysis
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
+                    >
+                      Explore Datasets
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/signup">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
+                      >
+                        Get Started
+                      </Button>
+                    </Link>
+                    <Link href="/login">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="border-slate-700 text-yellow-900 font-bold hover:border-[var(--accent-gold)]"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
 
               <div className="flex gap-8 mt-6">
