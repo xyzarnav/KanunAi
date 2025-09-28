@@ -1,46 +1,7 @@
-# Kanban Board Application
+# KanunAi
 
-A modern, full-stack Kanban board application built with Next.js, React, TypeScript, and Node.js.
+Comprehensive Legal Assistant for summarising legal documents, clarifying legal doubts, finding similarity between past cases, etc.
 
-## 🚀 Features
-
-- **Interactive Kanban Board**: Drag and drop tasks between columns
-- **Real-time Updates**: Live synchronization across multiple users
-- **Modern UI**: Built with shadcn/ui components and Tailwind CSS
-- **TypeScript**: Full type safety across frontend and backend
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **React** - UI library
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - Modern UI component library
-
-### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **TypeScript** - Type safety
-- **CORS** - Cross-origin resource sharing
-
-## 📁 Project Structure
-
-```
-majorProject/
-├── frontend/          # Next.js React application
-│   ├── src/
-│   │   ├── app/       # App router pages
-│   │   ├── components/# React components
-│   │   └── lib/       # Utility functions
-│   └── package.json
-├── backend/           # Express.js API server
-│   ├── src/
-│   │   └── index.ts   # Main server file
-│   └── package.json
-└── README.md
-```
 
 ## 🚦 Getting Started
 
