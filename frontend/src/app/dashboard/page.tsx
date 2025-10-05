@@ -1,12 +1,11 @@
-'use client';
-import { useUser } from '@auth0/nextjs-auth0/client';
+ 'use client';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const { user } = useUser();
+  // temporary: no auth provider present yet
 
   return (
     <ProtectedRoute>
@@ -22,9 +21,9 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <p><span className="text-slate-400">Name:</span> {user?.name}</p>
-                    <p><span className="text-slate-400">Email:</span> {user?.email}</p>
-                    <p><span className="text-slate-400">Role:</span> <span className="text-[var(--accent-gold)] capitalize">{user?.role || 'Not set'}</span></p>
+                    <p><span className="text-slate-400">Name:</span> {'—'}</p>
+                    <p><span className="text-slate-400">Email:</span> {'—'}</p>
+                    <p><span className="text-slate-400">Role:</span> <span className="text-[var(--accent-gold)] capitalize">{'Not set'}</span></p>
                   </div>
                 </CardContent>
               </Card>

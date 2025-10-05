@@ -17,12 +17,7 @@ export default function ProfilePage() {
   useEffect(() => {
     // Only redirect if we're not loading and not authenticated
     if (!isLoading && !isAuthenticated) {
-      // Add a small delay to prevent flash
-      const timer = setTimeout(() => {
-        router.push("/login");
-      }, 100);
-      
-      return () => clearTimeout(timer);
+      router.push("/login");
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -35,13 +30,6 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-        <style jsx global>{`
-          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
-          :root{
-            --accent-gold: #D4AF37;
-            --accent-deep: #0b2340;
-          }
-        `}</style>
         <div className="text-center">
           <div className="w-12 h-12 rounded-lg bg-[var(--accent-gold)]/10 flex items-center justify-center border border-[var(--accent-gold)]/20 mx-auto mb-4">
             <IconScale className="w-6 h-6 text-[var(--accent-gold)] animate-pulse" />
@@ -58,13 +46,6 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-black text-white p-4">
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
-        :root{
-          --accent-gold: #D4AF37;
-          --accent-deep: #0b2340;
-        }
-      `}</style>
 
       <div className="container mx-auto max-w-4xl py-12">
         {/* Header */}

@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // Let the API routes handle Auth0 logic
+  // Allow access to public routes
+  const publicRoutes = ['/login', '/signup', '/'];
+  if (publicRoutes.includes(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
+  // For protected routes, let the client-side handle authentication
+  // The middleware will only check for basic route protection
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    '/api/auth/:path*',
+    '/dashboard/:path*',
+    '/profile/:path*',
   ],
 };

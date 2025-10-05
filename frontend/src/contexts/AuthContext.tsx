@@ -4,10 +4,12 @@ import { createContext, useContext, useEffect, ReactNode } from "react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { loadUserFromStorage, logout as logoutAction, setLoading } from "@/store/slices/authSlice";
 
+import type { User } from "@/store/slices/authSlice";
+
 interface AuthContextType {
-  user: any;
+  user: User | null;
   token: string | null;
-  login: (user: any, token: string) => void;
+  login: (user: User, token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -26,9 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch(loadUserFromStorage());
   }, [dispatch]);
 
-  const login = (userData: any, tokenData: string) => {
+  const login = (_userData: User, _tokenData: string) => {
     // This will be handled by Redux thunks in the components
-    console.log("Login function called - use Redux actions instead");
+    // Keep a no-op to satisfy the context contract
+    void _userData;
+    void _tokenData;
   };
 
   const logout = () => {
@@ -36,15 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      token, 
-      login, 
-      logout, 
-      isAuthenticated, 
-      isLoading, 
-      error 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        isAuthenticated,
+        isLoading,
+        error,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -4,10 +4,10 @@ import User from '../models/user.model';
 
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const { auth0Id, name, email, mobile, role } = req.body;
+    const { authId, name, email, mobile, role } = req.body;
     
     const user = new User({
-      auth0Id,
+      authId,
       name,
       email,
       mobile,
@@ -23,8 +23,8 @@ export const createUser = async (req: Request, res: Response) => {
 
 export const getUserProfile = async (req: Request, res: Response) => {
   try {
-    const { auth0Id } = req.params;
-    const user = await User.findOne({ auth0Id });
+  const { authId } = req.params;
+  const user = await User.findOne({ authId });
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

@@ -42,13 +42,6 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
-        :root{
-          --accent-gold: #D4AF37;
-          --accent-deep: #0b2340;
-        }
-      `}</style>
 
       <div className="w-full max-w-md">
         {/* Logo and Title */}
@@ -127,7 +120,7 @@ export default function LoginPage() {
 
             <div className="mt-6 text-center">
               <p className="text-slate-400 text-sm">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/signup"
                   className="text-[var(--accent-gold)] hover:text-amber-400 font-medium"

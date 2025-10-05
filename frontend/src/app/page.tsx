@@ -1,15 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { FloatingDock } from "@/components/ui/floating-dock";
 import {
   IconBook,
   IconGavel,
   IconHome,
   IconScale,
-  IconId,
-  IconMoodSmile,
-  IconSettings,
   IconUserFilled,
   IconLogin,
   IconLogout,
@@ -100,13 +96,6 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-black text-white overflow-x-hidden">
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
-        :root{
-          --accent-gold: #D4AF37;
-          --accent-deep: #0b2340;
-        }
-      `}</style>
 
       {/* Existing navbar */}
       <div className="pt-8 px-4 py-2">

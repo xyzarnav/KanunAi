@@ -1,22 +1,24 @@
-// frontend/src/components/ProtectedRoute.tsx
 'use client';
-import { useUser } from '@auth0/nextjs-auth0';
+import { useAppSelector } from '@/store/hooks';
+import Loading from './ui/loading';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import Loading from './ui/loading';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { user, isLoading } = useUser();
+    const { isAuthenticated, isLoading, user } = useAppSelector((state) => state.auth);
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && !user) {
-            router.push('/api/auth/login');
+        if (!isLoading && !isAuthenticated) {
+            router.push('/login');
         }
-    }, [user, isLoading, router]);
+    }, [isAuthenticated, isLoading, router]);
 
     if (isLoading) return <Loading message="Authenticating..." />;
-    if (!user) return null;
+
+    if (!isAuthenticated) {
+        return null; // Will redirect to login
+    }
 
     return <>{children}</>;
 }
