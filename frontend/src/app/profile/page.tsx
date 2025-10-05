@@ -16,8 +16,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     // Only redirect if we're not loading and not authenticated
+    // Add a small delay to prevent immediate redirect during initial load
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      const timer = setTimeout(() => {
+        router.push("/login");
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
   }, [isAuthenticated, isLoading, router]);
 

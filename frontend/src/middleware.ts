@@ -7,8 +7,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For protected routes, let the client-side handle authentication
-  // The middleware will only check for basic route protection
+  // For protected routes, check if user has a token in localStorage
+  // Since middleware runs on server, we can't access localStorage directly
+  // So we'll let the client-side handle the authentication
   return NextResponse.next();
 }
 
