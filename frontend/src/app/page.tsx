@@ -31,7 +31,7 @@ export default function HomePage() {
     {
       title: "Legal Analysis",
       icon: <IconScale className="text-neutral-200 dark:text-neutral-400" />,
-      href: "/analysis",
+      href: "/case-analysis",
     },
     {
       title: "Case Law",
@@ -138,12 +138,14 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
                 {isAuthenticated ? (
                   <>
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
-                    >
-                      Start a Case Analysis
-                    </Button>
+                    <Link href="/case-analysis">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-[var(--accent-gold)] to-amber-500 text-black shadow-[0_8px_30px_rgba(212,175,55,0.15)] hover:scale-[1.02] transition-transform"
+                      >
+                        Start a Case Analysis
+                      </Button>
+                    </Link>  
                     <Button
                       variant="outline"
                       size="lg"
