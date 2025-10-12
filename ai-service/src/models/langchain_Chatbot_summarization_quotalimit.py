@@ -517,17 +517,12 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
 # USAGE
 # ============================================
 
+# Example usage:
 # if __name__ == "__main__":
-    
-#     API_KEY = "AIzaSyCotDum4DodejfnQdFLLHbJEwNEGKTbCPA"
-#     # Make sure this PDF file exists in your directory
+#     API_KEY = os.getenv('GEMINI_API_KEY')  # Get from .env file
 #     PDF_PATH = input("Enter the path to your PDF file: ")
-    
-    
-#     # Initialize
+#     
 #     summarizer = LegalDocSummarizer(api_key=API_KEY)
-    
-#     # Process
 #     summaries = summarizer.process_full_pipeline(
 #         pdf_path=PDF_PATH,
 #         quick_mode=False  # True = faster
