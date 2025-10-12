@@ -9,6 +9,7 @@ build/
 out/
 venv/
 */venv/
+*/cache/
 
 # Environment variables
 .env

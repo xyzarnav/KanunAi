@@ -215,6 +215,8 @@ export default function CaseAnalysis() {
                     type="button"
                     onClick={removeFile}
                     className="text-gray-400 hover:text-red-500 transition-colors"
+                    aria-label="Remove file"
+                    title="Remove file"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

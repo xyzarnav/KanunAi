@@ -11,6 +11,10 @@ import time
 import pickle
 from typing import List, Dict
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAI
@@ -132,18 +136,18 @@ class LegalDocSummarizer:
     def chunk_document(self, pages_per_chunk: int = 25):
         """
         Smart chunking based on page numbers
-        Combines 15 pages into one chunk for better context
+        Combines pages into chunks for better context
         """
+        
+        if not self.documents:
+            raise ValueError("No documents loaded. Please run load_document() first.")
         
         print(f"\n📦 Chunking document (pages per chunk={pages_per_chunk})...")
         
+        # Clear cache to force new chunking
         cache_file = self.cache_dir / "chunks.pkl"
         if cache_file.exists():
-            print("   ⚡ Loading chunks from cache...")
-            with open(cache_file, 'rb') as f:
-                self.chunks = pickle.load(f)
-            print(f"   ✓ Loaded {len(self.chunks)} chunks from cache")
-            return self.chunks
+            os.remove(cache_file)
         
         # Calculate number of chunks needed (ceiling division)
         total_pages = len(self.documents)
@@ -189,16 +193,14 @@ class LegalDocSummarizer:
         
         print("\n🔍 Creating vector embeddings (LOCAL - no API usage)...")
         
+        if not self.chunks:
+            raise ValueError("No chunks available. Please run chunk_document() first.")
+
+        # Clear cache to force new vector store creation
         cache_file = self.cache_dir / "vectorstore"
         if cache_file.exists():
-            print("   ⚡ Loading vector store from cache...")
-            self.vectorstore = FAISS.load_local(
-                str(cache_file), 
-                self.embeddings,
-                allow_dangerous_deserialization=True
-            )
-            print("   ✓ Loaded from cache")
-            return self.vectorstore
+            import shutil
+            shutil.rmtree(cache_file)
         
         print(f"   Processing {len(self.chunks)} chunks locally...")
         print("   (This runs on your CPU, may take 1-2 minutes)")
@@ -469,7 +471,7 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
             return {'answer': f"Error: {e}", 'sources': []}
     
     
-    def process_full_pipeline(self, pdf_path: str, quick_mode: bool = False):
+    def process_full_pipeline(self, pdf_path: str, quick_mode: bool = False, chunk_size: int = 25):
         """Complete pipeline"""
         
         print("\n" + "="*70)
@@ -479,8 +481,7 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
         start_time = time.time()
         
         self.load_document(pdf_path)
-        # self.chunk_document(pages_per_chunk=15)  # 15 pages per chunk
-        self.chunk_document(pages_per_chunk=25)  # 15 pages per chunk
+        self.chunk_document(pages_per_chunk=chunk_size)  # Use user-defined chunk size
         self.create_vector_store()  # LOCAL - no API!
         self.summarize_hierarchical(chunk_summaries_only=quick_mode)
         self.save_summaries()
@@ -520,11 +521,25 @@ if __name__ == "__main__":
     current_dir = Path(__file__).parent.resolve()
     project_root = current_dir.parent.parent
     
-    API_KEY = "AIzaSyCotDum4DodejfnQdFLLHbJEwNEGKTbCPA"
+    # Get API key from environment variable
+    API_KEY = os.getenv('GEMINI_API_KEY')
+    if not API_KEY:
+        raise ValueError("GEMINI_API_KEY not found in .env file")
     
     # Use relative path from project root
-    PDF_PATH = str(project_root / "test_pdf" / "legal_doc.pdf")
+    PDF_PATH = str(project_root / "src/test_pdf" / "legal_doc.pdf")
     CACHE_DIR = str(project_root / "cache")
+    
+    # Get chunk size from user
+    while True:
+        try:
+            chunk_size = int(input("Enter the number of pages per chunk (recommended 5-25): "))
+            if chunk_size <= 0:
+                print("Please enter a positive number.")
+                continue
+            break
+        except ValueError:
+            print("Please enter a valid number.")
     
     # Initialize with proper directories
     summarizer = LegalDocSummarizer(
@@ -532,10 +547,11 @@ if __name__ == "__main__":
         cache_dir=CACHE_DIR
     )
     
-    # Process
+    # Process with user-defined chunk size
     summaries = summarizer.process_full_pipeline(
         pdf_path=PDF_PATH,
-        quick_mode=False  # True = faster
+        quick_mode=False,  # True = faster
+        chunk_size=chunk_size  # Pass the user-defined chunk size
     )
     # View
     print("\n" + "="*70)
