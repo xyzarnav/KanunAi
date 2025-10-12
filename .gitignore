@@ -7,9 +7,13 @@ dist/
 build/
 .next/
 out/
+
+#Ai service
 venv/
 */venv/
 */cache/
+# */output/*
+/ai-service/src/output/*
 
 # Environment variables
 .env

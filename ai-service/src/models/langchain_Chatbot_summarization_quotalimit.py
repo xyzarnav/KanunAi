@@ -382,31 +382,43 @@ Executive Summary (800-1200 words):"""
         return self.summaries
     
     
-    def save_summaries(self, output_dir: str = "./output"):
+    def save_summaries(self, output_dir: str = None):
         """Save summaries to files"""
         
+        if output_dir is None:
+            # Use absolute path based on current file location
+            current_dir = Path(__file__).parent
+            output_dir = str(current_dir.parent.parent / "output" / "chatbot_summarizer")
+            
         output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
+        output_path.mkdir(exist_ok=True, parents=True)
+        
+        # Clear existing files in the directory
+        if output_path.exists():
+            for file in output_path.glob("*.md"):
+                file.unlink()
+            for file in output_path.glob("*.json"):
+                file.unlink()
         
         print(f"\n💾 Saving summaries to {output_dir}...")
         
         if 'executive_summary' in self.summaries:
-            with open(output_path / "executive_summary.txt", 'w', encoding='utf-8') as f:
-                f.write("="*60 + "\n")
-                f.write("EXECUTIVE SUMMARY\n")
-                f.write("="*60 + "\n\n")
+            with open(output_path / "executive_summary.md", 'w', encoding='utf-8') as f:
+                f.write("# Executive Summary\n\n")
+                f.write("## Chatbot Summarizer Output\n\n")
+                f.write("---\n\n")
                 f.write(self.summaries['executive_summary'])
-            print("   ✓ executive_summary.txt")
+            print("   ✓ executive_summary.md")
         
         if 'chunk_summaries' in self.summaries:
-            with open(output_path / "chunk_summaries.txt", 'w', encoding='utf-8') as f:
+            with open(output_path / "chunk_summaries.md", 'w', encoding='utf-8') as f:
+                f.write("# Chunk Summaries\n\n")
                 for i, summary in enumerate(self.summaries['chunk_summaries']):
-                    f.write(f"\n{'='*60}\n")
-                    f.write(f"CHUNK {i+1} SUMMARY\n")
-                    f.write(f"{'='*60}\n\n")
+                    f.write(f"\n## Chunk {i+1}\n\n")
+                    f.write("---\n\n")
                     f.write(summary)
                     f.write("\n\n")
-            print("   ✓ chunk_summaries.txt")
+            print("   ✓ chunk_summaries.md")
         
         import json
         with open(output_path / "all_summaries.json", 'w', encoding='utf-8') as f:
@@ -471,7 +483,7 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
             return {'answer': f"Error: {e}", 'sources': []}
     
     
-    def process_full_pipeline(self, pdf_path: str, quick_mode: bool = False, chunk_size: int = 25):
+    def process_full_pipeline(self, pdf_path: str, quick_mode: bool = False, chunk_size: int = 25, output_dir: str = None):
         """Complete pipeline"""
         
         print("\n" + "="*70)
@@ -484,7 +496,12 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
         self.chunk_document(pages_per_chunk=chunk_size)  # Use user-defined chunk size
         self.create_vector_store()  # LOCAL - no API!
         self.summarize_hierarchical(chunk_summaries_only=quick_mode)
-        self.save_summaries()
+        
+        # Use absolute path for output
+        if output_dir is None:
+            output_dir = str(Path(pdf_path).parent.parent / "output" / "chatbot_summarizer")
+        self.save_summaries(output_dir=output_dir)
+        
         self.setup_qa_chain()
         
         elapsed = time.time() - start_time
