@@ -92,3 +92,17 @@ This project is licensed under the ISC License.
 - [shadcn/ui Documentation](https://ui.shadcn.com)
 - [Express.js Documentation](https://expressjs.com)
 - [TypeScript Documentation](https://www.typescriptlang.org/docs)
+
+## 🐍 AI Service notes
+
+If you use the Python `ai-service/` for local summarization, there was a known issue where uploaded PDFs were attempted to be read as UTF-8 text which crashes with a UnicodeDecodeError. This has been fixed by detecting PDF files (by extension or file header) and using a PDF loader instead of text-mode reading.
+
+To run the ai-service locally, install Python dependencies listed in `ai-service/requirements.txt` and run the service in that folder. Example:
+
+```powershell
+cd ai-service
+python -m pip install -r requirements.txt
+# then run your ai-service script as needed
+```
+
+If you still see decoding errors when uploading files, please open an issue with the file name and stack trace.

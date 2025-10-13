@@ -117,16 +117,49 @@ class LegalDocSummarizer:
             return self.documents
         
         try:
+            # Determine whether the file is a PDF. Some uploads may not have a .pdf
+            # extension (for example when saved with a random name). Check the
+            # extension first, then fall back to checking the file magic bytes.
             file_ext = Path(file_path).suffix.lower()
-            if file_ext == '.pdf':
+            is_pdf = False
+
+            try:
+                if file_ext == '.pdf':
+                    is_pdf = True
+                else:
+                    # Read the first few bytes to check for PDF magic header
+                    with open(file_path, 'rb') as fb:
+                        head = fb.read(4)
+                        if head.startswith(b'%PDF'):
+                            is_pdf = True
+            except Exception as header_exc:
+                print(f"   ⚠️ Could not read file header: {header_exc}")
+
+            if is_pdf:
                 # Load PDF
                 loader = PyPDFLoader(file_path)
                 self.documents = loader.load()
                 print(f"   ✓ Loaded {len(self.documents)} pages from PDF")
             else:
-                # Load as text file
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # Load as text file. Try utf-8, then fall back to latin-1. If both
+                # fail, attempt to treat file as a PDF as a last resort.
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except UnicodeDecodeError:
+                    try:
+                        with open(file_path, 'r', encoding='latin-1') as f:
+                            content = f.read()
+                        print("   ⚠️ Read text file with latin-1 encoding (fallback)")
+                    except Exception as text_exc:
+                        print(f"   ⚠️ Text read failed: {text_exc}. Attempting to load as PDF.")
+                        loader = PyPDFLoader(file_path)
+                        self.documents = loader.load()
+                        print(f"   ✓ Loaded {len(self.documents)} pages from PDF (fallback)")
+                        with open(cache_file, 'wb') as f:
+                            pickle.dump(self.documents, f)
+                        return self.documents
+
                 # Create a single document from text content
                 self.documents = [Document(page_content=content, metadata={"pages": "1", "chunk": 1})]
                 print(f"   ✓ Loaded text file ({len(content)} characters)")
