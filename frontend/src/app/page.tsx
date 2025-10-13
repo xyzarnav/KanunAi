@@ -97,14 +97,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-black text-white overflow-x-hidden">
 
-      {/* Existing navbar */}
-      <div className="pt-8 px-4 py-2">
-        <FloatingDock
-          items={navigationItems}
-          desktopClassName="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
-          mobileClassName="fixed top-8 right-4 z-50"
-        />
-      </div>
+      {/* FloatingDock is now globally rendered via layout; removed here to avoid duplication */}
 
       {/* Hero Section - two column professional layout */}
       <section className="relative min-h-screen flex items-center">

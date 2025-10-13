@@ -88,7 +88,7 @@ export default function CaseAnalysis() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950">
+      {/* <header className="border-b border-gray-800 bg-gray-950">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -104,10 +104,10 @@ export default function CaseAnalysis() {
             </div>
           </div>
         </div>
-      </header>
+      </header> */}
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-6 py-42">
         {/* Page Title & Description */}
         <div className="mb-10">
           <div className="flex items-center space-x-3 mb-4">
@@ -123,7 +123,7 @@ export default function CaseAnalysis() {
 
         {/* Analysis Form */}
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Case Title Section */}
+          {/* Case Title Section
           <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
             <label className="block mb-3">
               <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
@@ -138,33 +138,15 @@ export default function CaseAnalysis() {
               className="w-full bg-gray-950 border border-gray-700 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all"
               required
             />
-          </div>
+          </div> */}
 
-          {/* Legal Issue Section */}
-          <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
-            <label className="block mb-3">
-              <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                Legal Question / Issue Description *
-              </span>
-            </label>
-            <textarea
-              value={legalIssue}
-              onChange={(e) => setLegalIssue(e.target.value)}
-              placeholder="Describe the legal issue, question, or the specific aspect you want to analyze..."
-              rows={6}
-              className="w-full bg-gray-950 border border-gray-700 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all resize-none"
-              required
-            />
-            <p className="text-gray-500 text-sm mt-3">
-              Be specific about the legal principles, statutes, or precedents you want analyzed
-            </p>
-          </div>
+         
 
           {/* File Upload Section */}
           <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
             <label className="block mb-4">
               <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                Upload Documents (Optional)
+                Upload Documents 
               </span>
             </label>
             
@@ -225,6 +207,25 @@ export default function CaseAnalysis() {
                 </div>
               </div>
             )}
+          </div>
+           {/* Legal Issue Section */}
+           <div className="bg-gray-900/50 rounded-2xl p-8 border border-gray-800">
+            <label className="block mb-3">
+              <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                Legal Question / Issue Description *
+              </span>
+            </label>
+            <textarea
+              value={legalIssue}
+              onChange={(e) => setLegalIssue(e.target.value)}
+              placeholder="Describe the legal issue, question, or the specific aspect you want to analyze..."
+              rows={6}
+              className="w-full bg-gray-950 border border-gray-700 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all resize-none"
+              required
+            />
+            <p className="text-gray-500 text-sm mt-3">
+              Be specific about the legal principles, statutes, or precedents you want analyzed
+            </p>
           </div>
 
           {/* Info Banner */}
