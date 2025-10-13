@@ -7,6 +7,7 @@ import compression from "compression";
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
+import analysisRoutes from './routes/analysis.routes.js';
 
 const app: Application = express();
 dotenv.config();
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
