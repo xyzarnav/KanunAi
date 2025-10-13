@@ -10,6 +10,13 @@ export default function CaseAnalysis() {
   const [caseTitle, setCaseTitle] = useState('');
   const [legalIssue, setLegalIssue] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const toggleQuestion = (q: string) => {
+    setSelectedQuestions((prev) => {
+      if (prev.includes(q)) return prev.filter((x) => x !== q);
+      return [...prev, q];
+    });
+  };
   const [dragActive, setDragActive] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [summaryMd, setSummaryMd] = useState<string>('');
@@ -74,6 +81,9 @@ export default function CaseAnalysis() {
         const textPayload = `${caseTitle ? 'Title: ' + caseTitle + '\n\n' : ''}${legalIssue}`;
         form.append('text', textPayload);
       }
+      if (selectedQuestions.length > 0) {
+        form.append('questions', selectedQuestions.join('||'));
+      }
 
       const resp = await fetch('/api/analysis/summary', {
         method: 'POST',
@@ -106,6 +116,41 @@ export default function CaseAnalysis() {
 
   const removeFile = () => setUploadedFile(null);
 
+  const downloadSummary = () => {
+    if (!summaryMd) return;
+    const blob = new Blob([summaryMd], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${caseTitle ? caseTitle.replace(/[^a-z0-9]/gi, '_') : 'summary'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printSummary = () => {
+    if (!summaryMd) return;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const doc = w.document;
+    const pre = doc.createElement('pre');
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    pre.textContent = summaryMd;
+    doc.body.appendChild(pre);
+    w.focus();
+    w.print();
+  };
+
+  const copySummary = async () => {
+    if (!summaryMd) return;
+    try {
+      await navigator.clipboard.writeText(summaryMd);
+      alert('Summary copied to clipboard');
+    } catch {
+      alert('Could not copy to clipboard');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <main className="max-w-7xl mx-auto px-6 py-42">
@@ -124,7 +169,7 @@ export default function CaseAnalysis() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           {/* Left Panel */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+            {/* <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <div className="block mb-3">
                 <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Case Title (optional)</span>
               </div>
@@ -134,7 +179,7 @@ export default function CaseAnalysis() {
                 placeholder="Enter case title to make the summary header look nicer"
                 className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all"
               />
-            </div>
+            </div> */}
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
               <div className="block mb-4">
                 <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Upload Documents</span>
@@ -181,6 +226,41 @@ export default function CaseAnalysis() {
               <div className="block mb-3">
                 <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Legal Question / Issue Description *</span>
               </div>
+                {/* Quick question checkboxes */}
+                <div className="mb-4">
+                  <div className="text-sm text-gray-400 mb-2">Quick prompts — tap to include in the analysis:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'What is the case about? (short)',
+                      'Give a short/simple summary',
+                      'Parties involved',
+                      'Purpose / relief sought',
+                      'Rights / obligations of each party',
+                      'Key terms to note'
+                    ].map((q) => {
+                      const active = selectedQuestions.includes(q);
+                      return (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => toggleQuestion(q)}
+                          className={`${styles.pill} px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                            active
+                              ? 'bg-yellow-500 text-black border-yellow-500 shadow-sm'
+                              : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-750'
+                          }`}
+                          aria-pressed={active}
+                          
+                          
+                          
+                          
+                        >
+                          {q}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               <textarea
                 value={legalIssue}
                 onChange={(e) => setLegalIssue(e.target.value)}
@@ -226,6 +306,24 @@ export default function CaseAnalysis() {
                   <div className="w-3 h-3 rounded-full bg-red-400" />
                   <div className="w-3 h-3 rounded-full bg-yellow-400" />
                   <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <div className="ml-4 flex items-center space-x-2">
+                    <button type="button" title="Download" onClick={downloadSummary} className={`${styles.toolbarBtn} p-2 rounded-md`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" />
+                      </svg>
+                    </button>
+                    <button type="button" title="Print" onClick={printSummary} className={`${styles.toolbarBtn} p-2 rounded-md`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18h12v-7H6v7z" />
+                      </svg>
+                    </button>
+                    <button type="button" title="Copy" onClick={copySummary} className={`${styles.toolbarBtn} p-2 rounded-md`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8M8 11h8M8 15h8" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 

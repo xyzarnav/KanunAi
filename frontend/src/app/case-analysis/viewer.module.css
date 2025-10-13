@@ -19,3 +19,20 @@
   color: #111827;
 } */
 
+/* Pill helper (additional smoothing for toggles) */
+.pill {
+  transition: all 160ms ease-in-out;
+}
+
+/* toolbar button hover */
+.toolbarBtn:hover {
+  background: #f3f4f6;
+}
+
+.toolbarBtn {
+  transition: background 120ms ease-in-out, transform 120ms ease-in-out;
+}
+.toolbarBtn:active {
+  transform: translateY(1px);
+}
+
