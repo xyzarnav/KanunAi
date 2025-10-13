@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, FileText, AlertCircle, Sparkles } from 'lucide-react';
+import { Upload, FileText, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import styles from './viewer.module.css';
 
 export default function CaseAnalysis() {
   const [caseTitle, setCaseTitle] = useState('');
@@ -24,15 +25,17 @@ export default function CaseAnalysis() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
+    const droppedFile = e.dataTransfer?.files?.[0];
+    if (droppedFile) {
+      const file = droppedFile;
       if (validateFile(file)) setUploadedFile(file);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+    const selected = e.target.files?.[0];
+    if (selected) {
+      const file = selected;
       if (validateFile(file)) setUploadedFile(file);
     }
   };
@@ -65,8 +68,12 @@ export default function CaseAnalysis() {
     setSummaryMd('');
     try {
       const form = new FormData();
-      if (uploadedFile) form.append('file', uploadedFile);
-      else form.append('text', `${caseTitle ? `Title: ${caseTitle}\n\n` : ''}${legalIssue}`);
+      if (uploadedFile) {
+        form.append('file', uploadedFile);
+      } else {
+        const textPayload = `${caseTitle ? 'Title: ' + caseTitle + '\n\n' : ''}${legalIssue}`;
+        form.append('text', textPayload);
+      }
 
       const resp = await fetch('/api/analysis/summary', {
         method: 'POST',
@@ -87,8 +94,9 @@ export default function CaseAnalysis() {
         }
         throw new Error(errMsg);
       }
-      const data = contentType.includes('application/json') ? await resp.json() : { summary: await resp.text() };
-      setSummaryMd(String((data as any).summary || ''));
+  const data = contentType.includes('application/json') ? await resp.json() : { summary: await resp.text() };
+  const summary = (data as unknown as { summary?: string })?.summary ?? '';
+  setSummaryMd(summary);
     } catch (err: any) {
       alert(err?.message || 'Failed to summarize');
     } finally {
@@ -117,16 +125,28 @@ export default function CaseAnalysis() {
           {/* Left Panel */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
-              <label className="block mb-4">
+              <div className="block mb-3">
+                <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Case Title (optional)</span>
+              </div>
+              <input
+                value={caseTitle}
+                onChange={(e) => setCaseTitle(e.target.value)}
+                placeholder="Enter case title to make the summary header look nicer"
+                className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all"
+              />
+            </div>
+            <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
+              <div className="block mb-4">
                 <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Upload Documents</span>
-              </label>
+              </div>
               {!uploadedFile ? (
-                <div
+                <button
+                  type="button"
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-10 text-center transition-all cursor-pointer ${dragActive ? 'border-yellow-500 bg-yellow-500/5' : 'border-gray-700 hover:border-gray-600 bg-gray-950'}`}
+                  className={`w-full text-left border-2 border-dashed rounded-xl p-10 transition-all ${dragActive ? 'border-yellow-500 bg-yellow-500/5' : 'border-gray-700 hover:border-gray-600 bg-gray-950'}`}
                 >
                   <input type="file" id="file-upload" onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt" className="hidden" />
                   <label htmlFor="file-upload" className="cursor-pointer">
@@ -134,7 +154,7 @@ export default function CaseAnalysis() {
                     <p className="text-gray-300 font-medium mb-2">Drop your document here or click to browse</p>
                     <p className="text-gray-500 text-sm">Supports PDF, DOC, DOCX, TXT (Max 10MB)</p>
                   </label>
-                </div>
+                </button>
               ) : (
                 <div className="bg-gray-950 rounded-xl p-6 border border-gray-700">
                   <div className="flex items-center justify-between">
@@ -158,9 +178,9 @@ export default function CaseAnalysis() {
             </div>
 
             <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
-              <label className="block mb-3">
+              <div className="block mb-3">
                 <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Legal Question / Issue Description *</span>
-              </label>
+              </div>
               <textarea
                 value={legalIssue}
                 onChange={(e) => setLegalIssue(e.target.value)}
@@ -193,16 +213,33 @@ export default function CaseAnalysis() {
             </div>
           </form>
 
-          {/* Right Panel */}
-          <div className="bg-gray-900/40 rounded-2xl p-6 border border-gray-800 min-h-[600px] overflow-auto">
-            <div className="text-sm text-gray-400 mb-4">Executive Summary</div>
-            {summaryMd ? (
-              <article className="prose prose-invert max-w-none">
-                <ReactMarkdown>{summaryMd}</ReactMarkdown>
-              </article>
-            ) : (
-              <div className="text-gray-500">The generated summary will appear here.</div>
-            )}
+          {/* Right Panel - PDF-like viewer */}
+          <div className="min-h-[600px]">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+              {/* Header bar like a PDF viewer */}
+              <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
+                <div>
+                  <div className="text-sm text-gray-500">Executive Summary</div>
+                  <div className="text-lg font-semibold text-gray-900">{caseTitle || 'Untitled Case'}</div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                </div>
+              </div>
+
+              {/* Content area with aesthetic scrollbar and spacing */}
+              <div className={`p-8 max-h-[70vh] overflow-y-auto ${styles.scrollArea}`}>
+                {summaryMd ? (
+                  <article className="prose max-w-none text-gray-900 leading-relaxed space-y-4">
+                    <ReactMarkdown>{summaryMd}</ReactMarkdown>
+                  </article>
+                ) : (
+                  <div className="text-gray-600">The generated summary will appear here.</div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>

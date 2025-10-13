@@ -1,0 +1,26 @@
+/* Custom Scrollbar - Webkit Browsers (Chrome, Edge, Safari) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.2);
+}
+
+/* Custom Scrollbar - Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #d97706 #f3f4f6;
+}
+
+/* Content styling */
+.prose {
+  color: #111827; /* Ensure text remains dark */
+}
