@@ -68,13 +68,27 @@ export default function CaseAnalysis() {
       if (uploadedFile) form.append('file', uploadedFile);
       else form.append('text', `${caseTitle ? `Title: ${caseTitle}\n\n` : ''}${legalIssue}`);
 
-      const resp = await fetch('http://localhost:5000/api/analysis/summary', {
+      const resp = await fetch('/api/analysis/summary', {
         method: 'POST',
         body: form,
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.message || 'Failed to summarize');
-      setSummaryMd(String(data.summary || ''));
+      const contentType = resp.headers.get('content-type') || '';
+      if (!resp.ok) {
+        let errMsg = 'Failed to summarize';
+        try {
+          if (contentType.includes('application/json')) {
+            const data = await resp.json();
+            errMsg = data?.message || data?.detail?.error || JSON.stringify(data);
+          } else {
+            errMsg = await resp.text();
+          }
+        } catch {
+          errMsg = await resp.text().catch(() => errMsg);
+        }
+        throw new Error(errMsg);
+      }
+      const data = contentType.includes('application/json') ? await resp.json() : { summary: await resp.text() };
+      setSummaryMd(String((data as any).summary || ''));
     } catch (err: any) {
       alert(err?.message || 'Failed to summarize');
     } finally {
