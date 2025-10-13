@@ -95,11 +95,19 @@ def main():
             text_data = ""
             if args.pdf:
                 try:
-                    loader = PyPDFLoader(args.pdf)
-                    docs = loader.load()
-                    text_data = "\n\n".join(d.page_content for d in docs)
+                    # Check file type and load accordingly
+                    file_path = Path(args.pdf)
+                    if file_path.suffix.lower() == '.pdf':
+                        # Load PDF content
+                        loader = PyPDFLoader(args.pdf)
+                        docs = loader.load()
+                        text_data = "\n\n".join(d.page_content for d in docs)
+                    else:
+                        # Load as text file
+                        with open(args.pdf, 'r', encoding='utf-8') as f:
+                            text_data = f.read()
                 except Exception as e:
-                    print(json.dumps({"error": f"PDF load error: {e}"}))
+                    print(json.dumps({"error": f"File load error: {e}"}))
                     return 1
             elif args.text:
                 text_data = args.text

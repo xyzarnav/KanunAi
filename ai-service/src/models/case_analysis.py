@@ -103,12 +103,12 @@ class LegalDocSummarizer:
         print("✓ Initialized LangChain + Gemini (FREE TIER MODE)")
     
     
-    def load_document(self, pdf_path: str) -> List[Document]:
-        """Load PDF"""
+    def load_document(self, file_path: str) -> List[Document]:
+        """Load PDF or text file"""
         
-        print(f"\n📄 Loading document: {pdf_path}")
+        print(f"\n📄 Loading document: {file_path}")
         
-        cache_file = self.cache_dir / f"{Path(pdf_path).stem}_docs.pkl"
+        cache_file = self.cache_dir / f"{Path(file_path).stem}_docs.pkl"
         if cache_file.exists():
             print("   ⚡ Loading from cache...")
             with open(cache_file, 'rb') as f:
@@ -117,10 +117,19 @@ class LegalDocSummarizer:
             return self.documents
         
         try:
-            loader = PyPDFLoader(pdf_path)
-            self.documents = loader.load()
-            
-            print(f"   ✓ Loaded {len(self.documents)} pages")
+            file_ext = Path(file_path).suffix.lower()
+            if file_ext == '.pdf':
+                # Load PDF
+                loader = PyPDFLoader(file_path)
+                self.documents = loader.load()
+                print(f"   ✓ Loaded {len(self.documents)} pages from PDF")
+            else:
+                # Load as text file
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # Create a single document from text content
+                self.documents = [Document(page_content=content, metadata={"pages": "1", "chunk": 1})]
+                print(f"   ✓ Loaded text file ({len(content)} characters)")
             
             with open(cache_file, 'wb') as f:
                 pickle.dump(self.documents, f)
