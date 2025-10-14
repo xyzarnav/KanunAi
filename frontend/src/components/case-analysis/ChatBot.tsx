@@ -24,8 +24,13 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
     const listRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-    }, [messages]);
+        // Scroll to bottom when messages change or loading state changes
+        if (listRef.current) {
+            setTimeout(() => {
+                listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+            }, 100);
+        }
+    }, [messages, loading]);
 
     const send = async () => {
         const question = input.trim();
@@ -83,9 +88,9 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-900 rounded-2xl">
+        <div className="flex flex-col bg-gray-900 rounded-2xl" style={{ height: '850px', maxHeight: '95vh' }}>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-800">
+            <div className="px-6 py-4 border-b border-gray-800 flex-shrink-0">
                 <h2 className="text-lg font-semibold text-white">Case Chat</h2>
                 <p className="text-xs text-gray-500 mt-0.5">AI-powered legal case analysis</p>
             </div>
@@ -93,7 +98,7 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
             {/* Messages Container with Custom Scrollbar */}
             <div 
                 ref={listRef} 
-                className="flex-1 overflow-y-auto scrollbar-thin"
+                className="flex-1 overflow-y-auto scrollbar-thin min-h-0"
                 style={{
                     scrollbarWidth: 'thin',
                     scrollbarColor: '#4B5563 #1F2937'
@@ -200,7 +205,7 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
             </div>
 
             {/* Input Area */}
-            <div className="border-t border-gray-800 bg-gray-900">
+            <div className="border-t border-gray-800 bg-gray-900 flex-shrink-0">
                 <div className="max-w-4xl mx-auto px-6 py-4">
                     <div className="flex gap-3 items-end">
                         <div className="flex-1 relative">
