@@ -1,6 +1,6 @@
 'use client';
 
-import { Upload, FileText, Sparkles } from 'lucide-react';
+import { Upload, FileText, Sparkles,Scale } from 'lucide-react';
 import Link from 'next/link';
 import styles from '../../styles/viewer.module.css'
 
@@ -44,7 +44,48 @@ export default function CaseInputPanel({
   handleSubmit,
 }: CaseInputPanelProps) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="relative">
+      {/* Professional Loading Overlay */}
+      {isAnalyzing && (
+         <div
+    className="absolute inset-0 z-0 bg-transparent backdrop-blur-sm rounded-2xl flex items-center justify-center animate-in fade-in duration-300"
+    style={{ transform: 'translateY(-0px)',height: '600px' }}
+  >
+          <div className="bg-transparent border border-yellow-500/30 rounded-2xl p-8 shadow-2xl max-w-sm mx-4">
+            {/* Animated Icon */}
+            <div className="relative w-20 h-20 mx-auto mb-6">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-yellow-500 rounded-full animate-spin"></div>
+              
+              {/* Inner pulsing circle */}
+              <div className="absolute inset-3 bg-yellow-500/20 rounded-full animate-pulse"></div>
+              
+              {/* Center icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Scale className="w-8 h-8 text-yellow-500 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Text Content */}
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-bold text-white">Analyzing Document</h3>
+              <p className="text-gray-400 text-sm">
+                KanunAI is processing your case...
+              </p>
+              
+              {/* Progress dots */}
+              <div className="flex justify-center items-center gap-2 pt-4">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {/* Case Title - commented out as in original */}
       {/* <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
         <div className="block mb-3">
@@ -166,5 +207,6 @@ export default function CaseInputPanel({
         </button>
       </div>
     </form>
+    </div>
   );
 }
