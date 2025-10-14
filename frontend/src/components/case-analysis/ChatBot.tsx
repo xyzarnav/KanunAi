@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 type Message = {
 	role: "user" | "assistant";
@@ -40,12 +41,35 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
 			});
 			if (!resp.ok) {
 				const errText = await resp.text();
-				throw new Error(errText || "Chat failed");
+				// Try to extract answer from error JSON
+				let answer = "Sorry, something went wrong.";
+				try {
+					const errObj = JSON.parse(errText);
+					// Sometimes error is double-encoded
+					let raw = errObj?.error;
+					if (typeof raw === "string" && raw.startsWith("{")) {
+						try { raw = JSON.parse(raw); } catch {}
+					}
+					if (raw?.raw) {
+						// Try to extract answer from raw
+						const match = /\{\\?\"answer\\?\":(.+?)\}/.exec(raw.raw);
+						if (match) {
+							let ans = match[1];
+							ans = ans.replace(/^\\?\"|\\?\"$/g, "");
+							ans = ans.replace(/\\n/g, "\n").replace(/\\"/g, '"');
+							answer = ans;
+						}
+					} else if (raw?.answer) {
+						answer = raw.answer;
+					}
+				} catch {}
+				setMessages((m) => [...m, { role: "assistant", content: answer }]);
+				return;
 			}
 			const data = (await resp.json()) as { answer: string; sources?: string[] };
 			setMessages((m) => [...m, { role: "assistant", content: data.answer || "(no answer)" }]);
 		} catch (e: any) {
-			setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message || e}` }]);
+			setMessages((m) => [...m, { role: "assistant", content: `Sorry, something went wrong.` }]);
 		} finally {
 			setLoading(false);
 		}
@@ -67,11 +91,15 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
 							return (
 							<div key={key} className={`max-w-[85%] ${m.role === "user" ? "ml-auto text-right" : "mr-auto"}`}>
 						<div
-							className={`${
+							className={`$${
 								m.role === "user" ? "bg-yellow-500/20 border-yellow-500/30" : "bg-white/10 border-white/20"
 							} border px-3 py-2 rounded-lg whitespace-pre-wrap`}
 						>
-							{m.content}
+							{m.role === "assistant" ? (
+								<ReactMarkdown>{m.content}</ReactMarkdown>
+							) : (
+								m.content
+							)}
 						</div>
 					</div>
 						);})}
