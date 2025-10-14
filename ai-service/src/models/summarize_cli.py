@@ -90,6 +90,13 @@ def main():
                 else:
                     summaries = summarizer.summarize_hierarchical(chunk_summaries_only=False)
                     exec_summary = summaries.get("executive_summary", "")
+
+                # Build and cache vector store for chat/QA (LOCAL embeddings only)
+                try:
+                    summarizer.create_vector_store()
+                except Exception as ve:
+                    # Don't fail the summary if vector store fails; chat can attempt init later
+                    print(f"[warn] vectorstore creation failed: {ve}", file=sys.stderr)
         else:
             # Naive local fallback: extract text and truncate
             text_data = ""
@@ -125,8 +132,8 @@ def main():
                 snippet
             )
 
-        # Print pure JSON to stdout
-        print(json.dumps({"executive_summary": exec_summary}))
+        # Print pure JSON to stdout, include session key for follow-up QA/chat initialization
+        print(json.dumps({"executive_summary": exec_summary, "session": cache_key}))
         return 0
     except Exception as e:
         # Print JSON error on stdout; logs went to stderr inside redirect_stdout scope

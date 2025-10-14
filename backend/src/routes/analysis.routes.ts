@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import { summarizeCase, summarizeCaseDirect } from "../controllers/analysis.controller.js";
+import { summarizeCase, initQA, chatQA } from "../controllers/analysis.controller.js";
 
 const router = Router();
 
@@ -12,11 +12,24 @@ try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch {}
 
 const upload = multer({ dest: uploadsDir });
 
-// Route for direct API calls (from Next.js)
-router.post("/summary", summarizeCaseDirect);
+// Single route for all summary requests
+router.post("/summary", upload.single("file"), summarizeCase);
 
-// Route for direct file uploads (if needed)
-router.post("/summary-upload", upload.single("file"), summarizeCase);
+// Initialize QA/vector store (optional file or text or session)
+// Use conditional middleware - if Content-Type is application/json, skip multer
+router.post("/init-qa", (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('application/json')) {
+    // Skip multer for JSON requests
+    next();
+  } else {
+    // Use multer for form data requests
+    upload.single("file")(req, res, next);
+  }
+}, initQA);
+
+// Chat endpoint
+router.post("/chat", chatQA);
 
 export default router;
 

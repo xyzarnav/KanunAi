@@ -14,120 +14,12 @@ function getPythonExecutable(): string {
   return process.platform === "win32" ? "python" : "python3";
 }
 
-export async function summarizeCaseDirect(req: Request, res: Response) {
-  try {
-    const contentType = req.headers['content-type'] || '';
-    
-    let text: string | undefined;
-    let filePath: string | undefined;
-    
-    if (contentType.includes('multipart/form-data')) {
-      // Handle file upload
-      const multer = require('multer');
-      const upload = multer({ dest: 'uploads/' });
-      
-      // Use multer to parse the form data
-      await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err: any) => {
-          if (err) reject(err);
-          else resolve(undefined);
-        });
-      });
-      
-      const file = (req as any).file;
-      if (file) {
-        filePath = file.path;
-      }
-      
-      // Also check for text field
-      if (req.body && req.body.text) {
-        text = req.body.text;
-      }
-    } else if (contentType.includes('application/json')) {
-      // Handle JSON input
-      text = req.body?.text;
-    } else {
-      // Handle plain text
-      text = req.body;
-    }
 
-    if (!text && !filePath) {
-      return res.status(400).json({ message: "Provide text or upload a file" });
-    }
-
-    const projectRoot = path.resolve(process.cwd(), "..");
-    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
-    const cliPath = path.join(aiServiceDir, "summarize_cli.py");
-
-    // Load ai-service .env so GEMINI_API_KEY is available
-    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
-
-    const args: string[] = [cliPath];
-    if (text) {
-      args.push("--text", text, "--quick");
-    } else if (filePath) {
-      args.push("--pdf", filePath, "--quick");
-    }
-
-    const pythonBin = getPythonExecutable();
-    console.log("[summarizer] python=", pythonBin);
-    console.log("[summarizer] args=", args.join(" "));
-
-    const child = spawn(pythonBin, args, {
-      cwd: aiServiceDir,
-      env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
-
-    const timeout = setTimeout(() => {
-      child.kill();
-      console.error("[summarizer:timeout] Python process timed out and was killed.");
-      if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
-      return res.status(504).json({ message: "Summarization timed out" });
-    }, 120000); // 2 minutes
-
-    child.on("close", (code) => {
-      clearTimeout(timeout);
-      if (filePath) {
-        // cleanup temp file
-        try { fs.unlinkSync(filePath); } catch {}
-      }
-      if (code !== 0) {
-        console.error(`[summarizer:stderr] ${stderr}`);
-        console.error(`[summarizer:stdout] ${stdout}`);
-        return res.status(500).json({ message: "Summarizer failed", error: stderr || stdout });
-      }
-      try {
-        const parsed = JSON.parse(stdout.trim());
-        return res.json({ summary: parsed.executive_summary ?? "" });
-      } catch (e: any) {
-        console.error(`[summarizer:parse_error] Failed to parse Python stdout: ${e.message}`);
-        console.error(`[summarizer:stdout] ${stdout}`);
-        return res.status(500).json({ message: "Invalid summarizer output", error: stdout });
-      }
-    });
-
-    child.on("error", (err) => {
-      clearTimeout(timeout);
-      console.error(`[summarizer:spawn_error] Failed to start Python process: ${err.message}`);
-      if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
-      return res.status(500).json({ message: "Failed to start summarizer process", error: err.message });
-    });
-
-  } catch (err: any) {
-    return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
-  }
-}
 
 export async function summarizeCase(req: Request, res: Response) {
   try {
-    const text: string | undefined = req.body?.text;
-    const file = (req as any).file as Express.Multer.File | undefined;
+  const text: string | undefined = req.body?.text;
+  const file = (req as any).file as { path: string } | undefined;
 
     if (!text && !file) {
       return res.status(400).json({ message: "Provide text or upload a file" });
@@ -153,7 +45,8 @@ export async function summarizeCase(req: Request, res: Response) {
 
     const child = spawn(pythonBin, args, {
       cwd: aiServiceDir,
-      env: { ...process.env },
+      // Force Python to use UTF-8 for stdout/stderr on Windows (avoids chcp/cp1252 UnicodeEncodeError)
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -180,22 +73,91 @@ export async function summarizeCase(req: Request, res: Response) {
       }
       if (code !== 0) {
         let detail: any = stderr || stdout;
+        console.error("[summarizer:FAILED] Python exited with code", code);
         if (stderr) console.error("[summarizer:stderr]", stderr);
         if (stdout) console.error("[summarizer:stdout]", stdout);
-        try {
-          detail = JSON.parse(String(detail));
-        } catch {}
-        return res.status(500).json({ message: "Summarizer failed", detail });
+        // Return both stderr and stdout for debugging
+        return res.status(500).json({
+          message: "Summarizer failed",
+          code,
+          stderr,
+          stdout
+        });
       }
       try {
         const parsed = JSON.parse(stdout.trim());
-        return res.json({ summary: parsed.executive_summary ?? "" });
+        return res.json({ summary: parsed.executive_summary ?? "", session: parsed.session });
       } catch (e) {
         console.error("[summarizer:parse_error]", e);
         console.error("[summarizer:stdout]", stdout);
         console.error("[summarizer:stderr]", stderr);
         return res.status(500).json({ message: "Invalid summarizer output", raw: stdout, stderr: stderr });
       }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
+  }
+}
+
+export async function initQA(req: Request, res: Response) {
+  try {
+    const { session, text } = req.body || {};
+    const pdfPath: string | undefined = (req as any).file?.path;
+    if (!session && !text && !pdfPath) {
+      return res.status(400).json({ message: "Provide session or text/pdf to initialize" });
+    }
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const cliPath = path.join(aiServiceDir, "qa_cli.py");
+    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
+
+    const args: string[] = [cliPath, "--init"]; 
+    if (session) args.push("--session", session);
+    if (text) args.push("--text", text);
+    if (pdfPath) args.push("--pdf", pdfPath);
+
+    const pythonBin = getPythonExecutable();
+  const child = spawn(pythonBin, args, { cwd: aiServiceDir, env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, stdio: ["ignore", "pipe", "pipe"] });
+
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d.toString()));
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.on("close", (code) => {
+      if (pdfPath) { try { fs.unlinkSync(pdfPath); } catch {} }
+      if (code !== 0) return res.status(500).json({ message: "Init failed", error: stderr || stdout });
+      try { const parsed = JSON.parse(stdout.trim()); return res.json(parsed); }
+      catch { return res.status(500).json({ message: "Invalid init output", raw: stdout }); }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
+  }
+}
+
+export async function chatQA(req: Request, res: Response) {
+  try {
+    const { session, question, text } = req.body || {};
+    const pdfPath: string | undefined = (req as any).file?.path;
+    if (!session || !question) {
+      return res.status(400).json({ message: "Provide session and question" });
+    }
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const cliPath = path.join(aiServiceDir, "qa_cli.py");
+    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
+
+    const args: string[] = [cliPath, "--ask", question, "--session", session];
+    if (text) args.push("--text", text);
+    if (pdfPath) args.push("--pdf", pdfPath);
+    const pythonBin = getPythonExecutable();
+  const child = spawn(pythonBin, args, { cwd: aiServiceDir, env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d.toString()));
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.on("close", (code) => {
+      if (pdfPath) { try { fs.unlinkSync(pdfPath); } catch {} }
+      if (code !== 0) return res.status(500).json({ message: "Chat failed", error: stderr || stdout });
+      try { const parsed = JSON.parse(stdout.trim()); return res.json(parsed); }
+      catch { return res.status(500).json({ message: "Invalid chat output", raw: stdout }); }
     });
   } catch (err: any) {
     return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
