@@ -1,0 +1,20 @@
+@keyframes pulse-slow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.animate-pulse-slow {
+    animation: pulse-slow 1.5s infinite;
+}
+
+.delay-0 {
+    animation-delay: 0s;
+}
+
+.delay-150 {
+    animation-delay: 0.15s;
+}
+
+.delay-300 {
+    animation-delay: 0.3s;
+}

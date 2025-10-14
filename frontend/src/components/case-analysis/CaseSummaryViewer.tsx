@@ -19,7 +19,7 @@ export default function CaseSummaryViewer({
   copySummary,
 }: CaseSummaryViewerProps) {
   return (
-    <div className="min-h-[600px]">
+    <div className="min-h-[700px]">
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
         {/* Header bar like a PDF viewer */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
@@ -53,7 +53,7 @@ export default function CaseSummaryViewer({
         </div>
 
         {/* Content area with aesthetic scrollbar and spacing */}
-        <div className={`p-8 max-h-[70vh] overflow-y-auto ${styles.scrollArea}`}>
+        <div className={`p-8 max-h-[80vh] overflow-y-auto ${styles.scrollArea}`}>
           {summaryMd ? (
             <article className="prose max-w-none text-gray-900 leading-relaxed space-y-4">
               <ReactMarkdown>{summaryMd}</ReactMarkdown>
