@@ -7,7 +7,7 @@ dist/
 build/
 .next/
 out/
-
+/backend/uploads/*
 # Environment variables
 .env
 .env.local
