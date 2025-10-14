@@ -51,3 +51,51 @@ Thumbs.db
 # Lock files (optional - you can keep these)
 package-lock.json
 yarn.lock
+
+# python residue files below
+
+# Python-specific (since venv is present)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# AI/ML outputs and vectors (e.g., embeddings, models, vector databases)
+*.h5
+*.pkl
+*.joblib
+*.onnx
+*.pb
+*.tflite
+vectors/
+embeddings/
+models/
+checkpoints/
+cache/
+*/cache/
+*/output/
+ai-service/output/
+ai-service/models/
+ai-service/vectors/
+
+# Additional caches and outputs
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Logs and temporary files
+*.log
+logs/
+temp/
+tmp/
+
+// ...existing code...
