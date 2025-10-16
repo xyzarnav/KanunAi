@@ -18,8 +18,9 @@ function getPythonExecutable(): string {
 
 export async function summarizeCase(req: Request, res: Response) {
   try {
-  const text: string | undefined = req.body?.text;
-  const file = (req as any).file as { path: string } | undefined;
+    const text: string | undefined = req.body?.text;
+    const file = (req as any).file as { path: string } | undefined;
+    const analysisType: string | undefined = req.body?.analysisType; // 'case' or 'contract'
 
     if (!text && !file) {
       return res.status(400).json({ message: "Provide text or upload a file" });
@@ -27,7 +28,12 @@ export async function summarizeCase(req: Request, res: Response) {
 
     const projectRoot = path.resolve(process.cwd(), "..");
     const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
-    const cliPath = path.join(aiServiceDir, "summarize_cli.py");
+    
+    // Determine which CLI to use based on analysisType
+    const isContractAnalysis = analysisType === 'contract';
+    const cliPath = isContractAnalysis 
+      ? path.join(aiServiceDir, "contract_analysis_cli.py")
+      : path.join(aiServiceDir, "summarize_cli.py");
 
     // Load ai-service .env so GEMINI_API_KEY is available
     dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
@@ -40,8 +46,9 @@ export async function summarizeCase(req: Request, res: Response) {
     }
 
     const pythonBin = getPythonExecutable();
-    console.log("[summarizer] python=", pythonBin);
-    console.log("[summarizer] args=", args.join(" "));
+    const logPrefix = isContractAnalysis ? "[contract-analyzer]" : "[summarizer]";
+    console.log(`${logPrefix} python=`, pythonBin);
+    console.log(`${logPrefix} args=`, args.join(" "));
 
     const child = spawn(pythonBin, args, {
       cwd: aiServiceDir,
@@ -56,11 +63,11 @@ export async function summarizeCase(req: Request, res: Response) {
     child.stderr.on("data", (d) => (stderr += d.toString()));
 
     child.on("error", (err) => {
-      console.error("[summarizer:spawn_error]", err);
+      console.error(`${logPrefix}:spawn_error`, err);
       return res.status(500).json({ message: "Failed to start Python process", error: err?.message || String(err) });
     });
 
-    const timeoutMs = Number(process.env.SUMMARY_TIMEOUT_MS || 120000);
+    const timeoutMs = Number(process.env.SUMMARY_TIMEOUT_MS || 300000); // Increased timeout for contract analysis
     const timer = setTimeout(() => {
       try { child.kill('SIGKILL'); } catch {}
     }, timeoutMs);
@@ -73,12 +80,12 @@ export async function summarizeCase(req: Request, res: Response) {
       }
       if (code !== 0) {
         let detail: any = stderr || stdout;
-        console.error("[summarizer:FAILED] Python exited with code", code);
-        if (stderr) console.error("[summarizer:stderr]", stderr);
-        if (stdout) console.error("[summarizer:stdout]", stdout);
+        console.error(`${logPrefix}:FAILED Python exited with code`, code);
+        if (stderr) console.error(`${logPrefix}:stderr`, stderr);
+        if (stdout) console.error(`${logPrefix}:stdout`, stdout);
         // Return both stderr and stdout for debugging
         return res.status(500).json({
-          message: "Summarizer failed",
+          message: "Analysis failed",
           code,
           stderr,
           stdout
@@ -86,12 +93,26 @@ export async function summarizeCase(req: Request, res: Response) {
       }
       try {
         const parsed = JSON.parse(stdout.trim());
-        return res.json({ summary: parsed.executive_summary ?? "", session: parsed.session });
+        
+        if (isContractAnalysis) {
+          // Contract analysis returns report and summary
+          return res.json({
+            report: parsed.comprehensive_report ?? "",
+            summary: parsed.executive_summary ?? "",
+            session: parsed.session
+          });
+        } else {
+          // Case analysis returns summary
+          return res.json({ 
+            summary: parsed.executive_summary ?? "", 
+            session: parsed.session 
+          });
+        }
       } catch (e) {
-        console.error("[summarizer:parse_error]", e);
-        console.error("[summarizer:stdout]", stdout);
-        console.error("[summarizer:stderr]", stderr);
-        return res.status(500).json({ message: "Invalid summarizer output", raw: stdout, stderr: stderr });
+        console.error(`${logPrefix}:parse_error`, e);
+        console.error(`${logPrefix}:stdout`, stdout);
+        console.error(`${logPrefix}:stderr`, stderr);
+        return res.status(500).json({ message: "Invalid analysis output", raw: stdout, stderr: stderr });
       }
     });
   } catch (err: any) {

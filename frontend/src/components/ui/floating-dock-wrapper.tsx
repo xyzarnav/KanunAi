@@ -107,7 +107,7 @@ export default function FloatingDockWrapper() {
     ];
   }
   if (pathname?.startsWith("/contract-analysis")) {
-    // Remove href for Chatbot, use onClick
+    // Remove href for items, use onClick
     items = [
       { title: "Home", icon: <IconHome className="text-neutral-200" />, href: "/" },
       { title: "Profile", icon: <IconUserFilled className="text-neutral-200" />, href: "/profile" },
@@ -125,34 +125,33 @@ export default function FloatingDockWrapper() {
           ]
         : [{ title: "Login", icon: <IconLogin className="text-neutral-200" />, href: "/login" }]),
       {
-        title: "Summary",
+        title: "Q&A",
         icon: <IconMessages className="text-neutral-200" />,
         href: "#",
         onClick: () => {
-          // Try to trigger a custom event for chat open
-          const event = new CustomEvent("open-case-summary");
+          // Try to trigger a custom event for contract analysis chat
+          const event = new CustomEvent("open-contract-analysis");
           window.dispatchEvent(event);
           // If not ready, show popup
           setShowChatPopup(true);
           setTimeout(() => setShowChatPopup(false), 2200);
         },
       },
-      { title: "Report", icon: <IconFileDescription className="text-neutral-200" />, href: "#",  onClick: () => {
-          // Try to trigger a custom event for chat open
-          const event = new CustomEvent("open-case-summary");
+      {
+        title: "Report",
+        icon: <IconFileDescription className="text-neutral-200" />,
+        href: "#",
+        onClick: () => {
+          // Trigger event for report view
+          const event = new CustomEvent("view-contract-report");
           window.dispatchEvent(event);
-          // If not ready, show popup
-          setShowChatPopup(true);
-          setTimeout(() => setShowChatPopup(false), 2200);
-        }, },
-      { title: "detailed", icon: <IconScale className="text-neutral-200" />, href: "#" ,  onClick: () => {
-          // Try to trigger a custom event for chat open
-          const event = new CustomEvent("open-case-summary");
-          window.dispatchEvent(event);
-          // If not ready, show popup
-          setShowChatPopup(true);
-          setTimeout(() => setShowChatPopup(false), 2200);
-        },},
+        },
+      },
+      {
+        title: "Files",
+        icon: <IconScale className="text-neutral-200" />,
+        href: "/files",
+      },
     ];
   }
   if (pathname === "/") {
@@ -179,8 +178,8 @@ export default function FloatingDockWrapper() {
         desktopClassName="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900"
         mobileClassName="fixed top-8 right-4 z-50"
       />
-      {pathname?.startsWith("/case-analysis") && (
-        <FloatingPopup show={showChatPopup} message="Please analyse the doc first" />
+      {(pathname?.startsWith("/case-analysis") || pathname?.startsWith("/contract-analysis")) && (
+        <FloatingPopup show={showChatPopup} message="Please analyze the document first" />
       )}
     </>
   );
