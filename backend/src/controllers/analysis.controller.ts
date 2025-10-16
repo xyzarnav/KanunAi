@@ -111,9 +111,16 @@ export async function summarizeCase(req: Request, res: Response) {
         
         if (isContractAnalysis) {
           // Contract analysis returns report and summary
+          // Format detailed analysis from chunk_analyses array
+          const chunkAnalyses = parsed.detailed_analysis ?? [];
+          const formattedDetailedAnalysis = chunkAnalyses
+            .map((chunk: any) => `## Section ${chunk.chunk_num} (Pages ${chunk.pages})\n\n${chunk.analysis}`)
+            .join('\n\n---\n\n');
+          
           return res.json({
             report: parsed.comprehensive_report ?? "",
             summary: parsed.executive_summary ?? "",
+            detailed: formattedDetailedAnalysis,
             session: parsed.session
           });
         } else {

@@ -1,12 +1,13 @@
 'use client';
 
-import ReactMarkdown from 'react-markdown';
 import { Download, Printer, Copy } from 'lucide-react';
 import styles from '../../styles/viewer.module.css';
+import { ColorfulMarkdown } from './ColorfulMarkdown';
 
 interface ContractReportViewerProps {
   reportMd: string;
   executiveSummary: string;
+  detailedAnalysis?: string;
   contractTitle: string;
   activeTab: 'report' | 'summary' | 'detailed';
   setActiveTab: (tab: 'report' | 'summary' | 'detailed') => void;
@@ -15,29 +16,52 @@ interface ContractReportViewerProps {
 export default function ContractReportViewer({
   reportMd,
   executiveSummary,
+  detailedAnalysis = '',
   contractTitle,
   activeTab,
   setActiveTab,
 }: ContractReportViewerProps) {
   const downloadReport = () => {
-    const content = activeTab === 'summary' ? executiveSummary : reportMd;
+    let content = '';
+    let filename = 'contract_analysis';
+    
+    if (activeTab === 'summary') {
+      content = executiveSummary;
+      filename = 'executive_summary';
+    } else if (activeTab === 'detailed') {
+      content = detailedAnalysis || '';
+      filename = 'detailed_chunk_analysis';
+    } else {
+      content = reportMd;
+    }
+    
     if (!content) return;
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const fileName = activeTab === 'summary' ? 'executive_summary' : 'contract_analysis';
-    a.download = `${contractTitle ? contractTitle.replace(/[^a-z0-9]/gi, '_') : fileName}.md`;
+    a.download = `${contractTitle ? contractTitle.replace(/[^a-z0-9]/gi, '_') : filename}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const printReport = () => {
-    const content = activeTab === 'summary' ? executiveSummary : reportMd;
+    let content = '';
+    let title = 'Contract Analysis Report';
+    
+    if (activeTab === 'summary') {
+      content = executiveSummary;
+      title = 'Executive Summary';
+    } else if (activeTab === 'detailed') {
+      content = detailedAnalysis || '';
+      title = 'Detailed Chunk Analysis';
+    } else {
+      content = reportMd;
+    }
+    
     if (!content) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    const title = activeTab === 'summary' ? 'Executive Summary' : 'Contract Analysis Report';
     printWindow.document.write(`
       <html>
         <head><title>${title} - ${contractTitle}</title></head>
@@ -53,7 +77,16 @@ export default function ContractReportViewer({
   };
 
   const copyReport = async () => {
-    const content = activeTab === 'summary' ? executiveSummary : reportMd;
+    let content = '';
+    
+    if (activeTab === 'summary') {
+      content = executiveSummary;
+    } else if (activeTab === 'detailed') {
+      content = detailedAnalysis || '';
+    } else {
+      content = reportMd;
+    }
+    
     if (!content) return;
     try {
       await navigator.clipboard.writeText(content);
@@ -64,24 +97,33 @@ export default function ContractReportViewer({
   };
 
   const getDisplayContent = () => {
-    if (activeTab === 'summary') return executiveSummary;
-    return reportMd;
+    let content = '';
+    if (activeTab === 'summary') {
+      content = executiveSummary;
+    } else if (activeTab === 'detailed') {
+      content = detailedAnalysis;
+    } else {
+      content = reportMd;
+    }
+    
+    // Remove emojis from content using a more compatible pattern
+    return content.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{27BF}]|[\u{1F680}-\u{1F6FF}]/gu, '').trim();
   };
 
   const displayContent = getDisplayContent();
 
   return (
-    <div className="min-h-[700px]">
+    <div className="min-h-[700px] bg-white">
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
         {/* Tab Navigation */}
         <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap lg:flex-nowrap">
               <button
                 onClick={() => setActiveTab('report')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
                   activeTab === 'report'
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-blue-500 text-white '
                     : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
                 }`}
               >
@@ -89,7 +131,7 @@ export default function ContractReportViewer({
               </button>
               <button
                 onClick={() => setActiveTab('summary')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
                   activeTab === 'summary'
                     ? 'bg-blue-500 text-white'
                     : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
@@ -97,6 +139,18 @@ export default function ContractReportViewer({
               >
                 Executive Summary
               </button>
+              {detailedAnalysis && (
+                <button
+                  onClick={() => setActiveTab('detailed')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                    activeTab === 'detailed'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Detailed Analysis
+                </button>
+              )}
             </div>
             <div className="text-sm text-gray-500">
               {contractTitle || 'Contract Analysis'}
@@ -148,13 +202,11 @@ export default function ContractReportViewer({
         </div>
 
         {/* Content area */}
-        <div className={`p-8 max-h-[80vh] overflow-y-auto ${styles.scrollArea}`}>
+        <div className={`p-8 max-h-[80vh] overflow-y-auto ${styles.scrollArea} bg-white`}>
           {displayContent ? (
-            <article className="prose max-w-none text-gray-900 leading-relaxed space-y-4">
-              <ReactMarkdown>{displayContent}</ReactMarkdown>
-            </article>
+            <ColorfulMarkdown>{displayContent}</ColorfulMarkdown>
           ) : (
-            <div className="text-center text-gray-600 py-20">
+            <div className="text-center text-gray-600 py-20 bg-white">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>

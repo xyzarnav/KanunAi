@@ -26,6 +26,7 @@ export default function ContractAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [reportMd, setReportMd] = useState<string>('');
   const [executiveSummary, setExecutiveSummary] = useState<string>('');
+  const [detailedAnalysis, setDetailedAnalysis] = useState<string>('');
   const [session, setSession] = useState<string | null>(null);
   const [chatReady, setChatReady] = useState(false);
   const [activeTab, setActiveTab] = useState<'report' | 'summary' | 'detailed'>('report');
@@ -153,10 +154,12 @@ export default function ContractAnalysis() {
 
       const report = (data as any)?.report ?? '';
       const summary = (data as any)?.summary ?? '';
+      const detailed = (data as any)?.detailed ?? '';
       const sess = (data as any)?.session ?? null;
 
       setReportMd(report);
       setExecutiveSummary(summary);
+      setDetailedAnalysis(detailed);
       setSession(sess);
 
       console.log('[ContractAnalysis] Analysis completed, session:', sess);
@@ -231,6 +234,7 @@ export default function ContractAnalysis() {
           <ContractReportViewer
             reportMd={reportMd}
             executiveSummary={executiveSummary}
+            detailedAnalysis={detailedAnalysis}
             contractTitle={contractTitle}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
