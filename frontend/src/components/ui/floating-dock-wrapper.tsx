@@ -9,6 +9,7 @@ import {
   IconMessages,
   IconFileDescription,
   IconScale,
+  IconContract 
 } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
@@ -105,6 +106,55 @@ export default function FloatingDockWrapper() {
       { title: "Analysis", icon: <IconScale className="text-neutral-200" />, href: "/case-analysis" },
     ];
   }
+  if (pathname?.startsWith("/contract-analysis")) {
+    // Remove href for Chatbot, use onClick
+    items = [
+      { title: "Home", icon: <IconHome className="text-neutral-200" />, href: "/" },
+      { title: "Profile", icon: <IconUserFilled className="text-neutral-200" />, href: "/profile" },
+      ...(isAuthenticated
+        ? [
+            {
+              title: "Logout",
+              icon: <IconLogout className="text-red-400" />,
+              href: "#",
+              onClick: () => {
+                logout();
+                router.push("/");
+              },
+            },
+          ]
+        : [{ title: "Login", icon: <IconLogin className="text-neutral-200" />, href: "/login" }]),
+      {
+        title: "Summary",
+        icon: <IconMessages className="text-neutral-200" />,
+        href: "#",
+        onClick: () => {
+          // Try to trigger a custom event for chat open
+          const event = new CustomEvent("open-case-summary");
+          window.dispatchEvent(event);
+          // If not ready, show popup
+          setShowChatPopup(true);
+          setTimeout(() => setShowChatPopup(false), 2200);
+        },
+      },
+      { title: "Report", icon: <IconFileDescription className="text-neutral-200" />, href: "#",  onClick: () => {
+          // Try to trigger a custom event for chat open
+          const event = new CustomEvent("open-case-summary");
+          window.dispatchEvent(event);
+          // If not ready, show popup
+          setShowChatPopup(true);
+          setTimeout(() => setShowChatPopup(false), 2200);
+        }, },
+      { title: "detailed", icon: <IconScale className="text-neutral-200" />, href: "#" ,  onClick: () => {
+          // Try to trigger a custom event for chat open
+          const event = new CustomEvent("open-case-summary");
+          window.dispatchEvent(event);
+          // If not ready, show popup
+          setShowChatPopup(true);
+          setTimeout(() => setShowChatPopup(false), 2200);
+        },},
+    ];
+  }
   if (pathname === "/") {
     items = [
       
@@ -112,6 +162,11 @@ export default function FloatingDockWrapper() {
         title: "Case Analysis",
         icon: <IconScale className="text-neutral-200" />,
         href: "/case-analysis",
+      },
+      {
+        title: "Contract Analysis",
+        icon: <IconContract className="text-neutral-200" />,
+        href: "/contract-analysis",
       },
       ...baseItems,
     ];
