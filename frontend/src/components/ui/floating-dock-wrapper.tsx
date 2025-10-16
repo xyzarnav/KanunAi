@@ -124,34 +124,34 @@ export default function FloatingDockWrapper() {
             },
           ]
         : [{ title: "Login", icon: <IconLogin className="text-neutral-200" />, href: "/login" }]),
-      {
-        title: "Q&A",
-        icon: <IconMessages className="text-neutral-200" />,
-        href: "#",
-        onClick: () => {
-          // Try to trigger a custom event for contract analysis chat
-          const event = new CustomEvent("open-contract-analysis");
-          window.dispatchEvent(event);
-          // If not ready, show popup
-          setShowChatPopup(true);
-          setTimeout(() => setShowChatPopup(false), 2200);
-        },
-      },
-      {
-        title: "Report",
-        icon: <IconFileDescription className="text-neutral-200" />,
-        href: "#",
-        onClick: () => {
-          // Trigger event for report view
-          const event = new CustomEvent("view-contract-report");
-          window.dispatchEvent(event);
-        },
-      },
-      {
-        title: "Files",
-        icon: <IconScale className="text-neutral-200" />,
-        href: "/files",
-      },
+      // {
+      //   title: "Q&A",
+      //   icon: <IconMessages className="text-neutral-200" />,
+      //   href: "#",
+      //   onClick: () => {
+      //     // Try to trigger a custom event for contract analysis chat
+      //     const event = new CustomEvent("open-contract-analysis");
+      //     window.dispatchEvent(event);
+      //     // If not ready, show popup
+      //     setShowChatPopup(true);
+      //     setTimeout(() => setShowChatPopup(false), 2200);
+      //   },
+      // },
+      // {
+      //   title: "Report",
+      //   icon: <IconFileDescription className="text-neutral-200" />,
+      //   href: "#",
+      //   onClick: () => {
+      //     // Trigger event for report view
+      //     const event = new CustomEvent("view-contract-report");
+      //     window.dispatchEvent(event);
+      //   },
+      // },
+      // {
+      //   title: "Files",
+      //   icon: <IconScale className="text-neutral-200" />,
+      //   href: "/files",
+      // },
     ];
   }
   if (pathname === "/") {
