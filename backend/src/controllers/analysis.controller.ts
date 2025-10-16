@@ -79,7 +79,6 @@ export async function summarizeCase(req: Request, res: Response) {
         try { fs.unlinkSync(file.path); } catch {}
       }
       if (code !== 0) {
-        let detail: any = stderr || stdout;
         console.error(`${logPrefix}:FAILED Python exited with code`, code);
         if (stderr) console.error(`${logPrefix}:stderr`, stderr);
         if (stdout) console.error(`${logPrefix}:stdout`, stdout);
