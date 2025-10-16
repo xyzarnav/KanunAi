@@ -78,18 +78,34 @@ export async function summarizeCase(req: Request, res: Response) {
         // cleanup temp file
         try { fs.unlinkSync(file.path); } catch {}
       }
-      if (code !== 0) {
-        console.error(`${logPrefix}:FAILED Python exited with code`, code);
+      
+      // Exit code can be null if process was killed; treat as failure
+      const exitCode = code ?? 1;
+      
+      if (exitCode !== 0) {
+        console.error(`${logPrefix}:FAILED Python exited with code`, exitCode);
         if (stderr) console.error(`${logPrefix}:stderr`, stderr);
         if (stdout) console.error(`${logPrefix}:stdout`, stdout);
         // Return both stderr and stdout for debugging
         return res.status(500).json({
           message: "Analysis failed",
-          code,
+          code: exitCode,
           stderr,
           stdout
         });
       }
+      
+      // Skip empty response
+      if (!stdout || stdout.trim() === "") {
+        console.error(`${logPrefix}:FAILED No output from Python process`);
+        return res.status(500).json({
+          message: "Analysis failed - no output",
+          code: exitCode,
+          stderr,
+          stdout: "(empty)"
+        });
+      }
+      
       try {
         const parsed = JSON.parse(stdout.trim());
         
