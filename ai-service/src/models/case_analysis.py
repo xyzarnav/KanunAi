@@ -12,6 +12,7 @@ import pickle
 from typing import List, Dict
 from pathlib import Path
 from dotenv import load_dotenv
+import re  # Added import for regular expressions
 
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent.parent / '.env')
@@ -738,11 +739,15 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
         
         try:
             result = self.qa_chain.invoke({"query": question})
-            
-            print(f"💬 Answer: {result['result'][:150]}...")
-            
+
+            # Modify the answer to remove any introductory phrases like "Based on the judgment..."
+            answer = result['result']
+            answer = re.sub(r'^Based on the judgment.*?[:,\-]\s*', '', answer, flags=re.IGNORECASE)
+
+            print(f"💬 Answer: {answer[:150]}...")
+
             return {
-                'answer': result['result'],
+                'answer': answer,
                 'sources': [doc.page_content[:200] + "..." for doc in result['source_documents']]
             }
         except Exception as e:
