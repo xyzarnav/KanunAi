@@ -258,6 +258,150 @@ class LegalDocSummarizer:
         return self.vectorstore
     
     
+    def generate_executive_summary_from_chunks(self, chunk_summaries: List[str]) -> str:
+        """Generates a 500-600 word executive summary from chunk summaries."""
+        
+        print("\n   STEP 3: Creating executive summary...")
+
+        combined = "\n\n".join([f"Section {i+1}:\n{s}" for i, s in enumerate(chunk_summaries)])
+        
+        # Force cache reset if needed for testing
+        summary_cache_file = self.cache_dir / "summaries.pkl"
+        if os.environ.get("FORCE_RESUMMARY") == "1" and summary_cache_file.exists():
+            print("   🔄 Forcing resummary (FORCE_RESUMMARY=1)")
+            try:
+                os.remove(summary_cache_file)
+            except Exception as e:
+                print(f"   ⚠️ Could not remove cache: {e}")
+                
+        exec_prompt = f"""Using the combined summaries below, create an executive summary EXACTLY BETWEEN 500 and 600 WORDS TOTAL.
+
+Structure the output exactly into these three sections (headings must match exactly):
+
+What case is this?
+What did the court decide?
+What are the outcomes?
+
+Under each heading, write a clear paragraph. Allocate words equally across all three sections (about 170-200 words per section). 
+Do NOT add any other headings, lists, notes or extra sections. Preserve factual accuracy and avoid repetition. 
+Total length MUST be between 500 and 600 words (not characters). Keep language formal and concise.
+
+Combined summaries:
+{combined}
+"""
+
+        self.rate_limiter.wait_if_needed()
+        callback = ProgressCallback()
+
+        try:
+            executive_summary = self.llm.predict(exec_prompt, callbacks=[callback])
+            # Post-process and enforce structure and word count (500-600 words)
+            import re
+
+            def _ensure_three_headings(text: str) -> str:
+                """Ensure text contains the three required headings. If not, split into 3 parts and add them."""
+                headings = [
+                    "What case is this?",
+                    "What did the court decide?",
+                    "What are the outcomes?",
+                ]
+
+                # Normalize whitespace
+                t = re.sub(r"\s+", " ", text.strip())
+
+                # Check if headings exist
+                found = [re.search(rf"{re.escape(h)}", t, flags=re.IGNORECASE) for h in headings]
+                if all(found):
+                    # Return text but normalize heading casing to exact expected headings
+                    for h in headings:
+                        t = re.sub(rf"(?i){re.escape(h)}", h, t)
+                    return t
+
+                # If headings not present, attempt to split into three roughly equal parts by sentences
+                sents = re.split(r"(?<=[\.!?])\s+", t)
+                # If too few sentences, return with headings prepended as simple wrapper
+                if len(sents) < 6:
+                    # Wrap entire text under the first heading and add placeholders
+                    return f"{headings[0]}\n{text}\n\n{headings[1]}\n[See above]\n\n{headings[2]}\n[See above]"
+
+                # Distribute sentences into 3 buckets
+                n = len(sents)
+                a = sents[: n//3]
+                b = sents[n//3: 2*n//3]
+                c = sents[2*n//3:]
+                
+                # Ensure each section is approximately balanced
+                # Target roughly 170-200 words per section (500-600 total across 3 sections)
+                part_a = " ".join(a).strip()[:1200]  # Roughly 200 words max
+                part_b = " ".join(b).strip()[:1200]
+                part_c = " ".join(c).strip()[:1200]
+
+                return f"{headings[0]}\n{part_a}\n\n{headings[1]}\n{part_b}\n\n{headings[2]}\n{part_c}"
+
+            def _word_count(text: str) -> int:
+                return len(text.split())
+
+            def _shorten_to_limit(text: str, max_words: int = 600) -> str:
+                words = text.split()
+                if len(words) <= max_words:
+                    return text
+                return " ".join(words[:max_words]).rstrip(' ,;:.')
+
+            # Normalize initial output into 3 headings
+            candidate = _ensure_three_headings(executive_summary)
+
+            # Enforce word count by re-prompting LLM if necessary (up to 2 retries)
+            max_retries = 2
+            retries = 0
+            final = candidate
+            wc = _word_count(final)
+            while (wc < 500 or wc > 600) and retries < max_retries:
+                retries += 1
+                self.rate_limiter.wait_if_needed()
+                if wc < 500:
+                    # Ask LLM to expand while preserving headings
+                    expand_prompt = (
+                        "The executive summary below is TOO SHORT. Expand it to be between 500 and 600 words, "
+                        "preserving the three headings exactly and retaining the original meaning. Do not add other headings.\n\n" + final
+                    )
+                    try:
+                        expanded = self.llm.predict(expand_prompt, callbacks=[callback])
+                        final = _ensure_three_headings(expanded)
+                    except Exception as e:
+                        print(f"   ⚠️  Error expanding summary: {e}")
+                        break
+                else:
+                    # Too long: ask LLM to shorten
+                    shorten_prompt = (
+                        "The executive summary below is TOO LONG. Shorten it to be between 500 and 600 words, "
+                        "preserving the three headings exactly and the main points. Do not add or remove headings.\n\n" + final
+                    )
+                    try:
+                        shortened = self.llm.predict(shorten_prompt, callbacks=[callback])
+                        final = _ensure_three_headings(shortened)
+                    except Exception as e:
+                        print(f"   ⚠️  Error shortening summary: {e}")
+                        # As a fallback, truncate to 600 words
+                        final = _shorten_to_limit(final, max_words=600)
+                        break
+
+                wc = _word_count(final)
+
+            # Final safety truncation if still too long
+            if _word_count(final) > 600:
+                final = _shorten_to_limit(final, max_words=600)
+                print(f"   ⚠️ Summary exceeded 600 words - truncated to {_word_count(final)} words")
+            elif _word_count(final) < 500:
+                print(f"   ⚠️ Summary too short ({_word_count(final)} words) - below 500 word target")
+            else:
+                print(f"   ✓ Summary word count: {_word_count(final)} words (target: 500-600)")
+
+            # If still shorter than 500, leave as-is but note (do not modify content further)
+            return final
+        except Exception as e:
+            print(f"   ⚠️  Error: {e}")
+            return "[Error creating executive summary]"
+
     def summarize_hierarchical(self, chunk_summaries_only: bool = False):
         """Hierarchical summarization using Gemini API (with rate limiting)"""
         
@@ -362,58 +506,8 @@ Provide a clear, focused summary (300-400 words):""",
             summaries_for_exec = chunk_summaries
         
         # STEP 3: Executive Summary
-        print("\n   STEP 3: Creating executive summary...")
-        
-        combined = "\n\n".join([f"Section {i+1}:\n{s}" for i, s in enumerate(summaries_for_exec)])
-        
-        exec_prompt = f"""Create a comprehensive executive summary of this Supreme Court judgment.
-
-Summaries:
-{combined}
-
-Structure the summary as follows:
-1. Case Overview
-   - Case name, citation, bench composition
-   - Date of judgment
-   - Brief background
-
-2. Legal Issues
-   - Main constitutional questions
-   - Key arguments by parties
-
-3. Constitutional Provisions
-   - Articles discussed
-   - Previous precedents considered
-
-4. Court's Analysis
-   - Main reasoning
-   - Interpretation of provisions
-   - Treatment of precedents
-
-5. Key Findings
-   - Principal holdings
-   - Constitutional principles established
-
-6. Final Orders
-   - Relief granted
-   - Specific directions
-   - Implications
-
-7. Significance
-   - Impact on constitutional law
-   - Precedential value
-   - Broader implications
-
-Executive Summary (800-1200 words):"""
-        
-        self.rate_limiter.wait_if_needed()
-        
-        try:
-            executive_summary = self.llm.predict(exec_prompt, callbacks=[callback])
-            self.summaries['executive_summary'] = executive_summary
-        except Exception as e:
-            print(f"   ⚠️  Error: {e}")
-            self.summaries['executive_summary'] = "[Error creating executive summary]"
+        executive_summary = self.generate_executive_summary_from_chunks(summaries_for_exec)
+        self.summaries['executive_summary'] = executive_summary
         
         # Save cache
         with open(cache_file, 'wb') as f:

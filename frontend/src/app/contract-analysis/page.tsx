@@ -178,7 +178,7 @@ export default function ContractAnalysis() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <main className="max-w-7xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-6 py-36">
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">

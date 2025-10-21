@@ -47,11 +47,14 @@ def main():
         if args.pdf:
             try:
                 st = os.stat(args.pdf)
-                cache_key_src = f"pdf:{args.pdf}:{st.st_mtime_ns}:{st.st_size}"
+                # Add FORCE_CACHE_BUST=timestamp to force new summaries for testing
+                cache_bust = os.environ.get("FORCE_CACHE_BUST", "")
+                cache_key_src = f"pdf:{args.pdf}:{st.st_mtime_ns}:{st.st_size}:{cache_bust}"
             except Exception:
                 cache_key_src = f"pdf:{args.pdf}"
         else:
-            cache_key_src = f"text:{args.text or ''}"
+            cache_bust = os.environ.get("FORCE_CACHE_BUST", "")
+            cache_key_src = f"text:{args.text or ''}:{cache_bust}"
         cache_key = hashlib.sha1(cache_key_src.encode("utf-8", errors="ignore")).hexdigest()
         cache_dir = str(cache_base / cache_key)
 
@@ -82,11 +85,12 @@ def main():
 
                 if args.quick:
                     summaries = summarizer.summarize_hierarchical(chunk_summaries_only=True)
-                    # Build a lightweight executive summary locally from chunk summaries
+                    # Build a proper executive summary from chunk summaries
                     chunks = summaries.get("chunk_summaries", [])
-                    head = "# Executive Summary (Quick)\n\n"
-                    body = "\n\n".join(f"## Section {i+1}\n\n{s}" for i, s in enumerate(chunks))
-                    exec_summary = head + body
+                    if chunks:
+                        exec_summary = summarizer.generate_executive_summary_from_chunks(chunks)
+                    else:
+                        exec_summary = "No summary could be generated."
                 else:
                     summaries = summarizer.summarize_hierarchical(chunk_summaries_only=False)
                     exec_summary = summaries.get("executive_summary", "")
