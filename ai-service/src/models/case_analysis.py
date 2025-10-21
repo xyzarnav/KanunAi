@@ -465,75 +465,55 @@ Combined summaries:
                 case_overview_match = re.search(r'Case Summary:(.*?)(?=What did the court decide:|$)', text, re.DOTALL)
                 court_decide_match = re.search(r'What did the court decide:(.*?)(?=What are the outcomes:|$)', text, re.DOTALL)
                 outcomes_match = re.search(r'What are the outcomes:(.*?)$', text, re.DOTALL)
-                
+
                 # Extract content and clean it
                 case_overview = case_overview_match.group(1).strip() if case_overview_match else ""
                 court_decide = court_decide_match.group(1).strip() if court_decide_match else ""
                 outcomes = outcomes_match.group(1).strip() if outcomes_match else ""
-                
+
                 # Fix incomplete sentences or truncated text (ending with "..")
                 def fix_truncated_text(text):
-                    # More aggressive handling of any form of ellipsis in the text
-                    # First, find if there are any ellipses in the last 30 characters
-                    last_part = text[-30:] if len(text) > 30 else text
-                    if '..' in last_part:
-                        # Find the last complete sentence that doesn't end with ellipses
-                        sentences = re.split(r'(?<=[.!?])\s+', text)
-                        if sentences:
-                            # Keep only sentences that don't end with ellipses
-                            clean_sentences = []
-                            for s in sentences:
-                                if not re.search(r'\.\.+\s*$', s.strip()):
-                                    clean_sentences.append(s)
-                                else:
-                                    # For the last truncated sentence, try to remove the ellipses
-                                    clean_s = re.sub(r'\.\.+\s*$', '.', s.strip())
-                                    if clean_s:
-                                        clean_sentences.append(clean_s)
-                            
-                            if clean_sentences:
-                                text = ' '.join(clean_sentences)
-                    
                     # Remove trailing ellipses followed by proper sentence ending
-                    text = re.sub(r'\.\.+\s*[.!?]$', '.', text)
+                    text = re.sub(r'\.+\s*[.!?]$', '.', text)
                     # Replace trailing ellipses with a period if at the end of text
-                    text = re.sub(r'\.\.+\s*$', '.', text)
+                    text = re.sub(r'\.+\s*$', '.', text)
                     # Replace any remaining ellipses in the text with periods
-                    text = re.sub(r'\.\.+', '.', text)
-                    # Make sure section doesn't end with a partial word or incomplete sentence
-                    if not re.search(r'[.!?]"\'\)]\s*$', text.strip()):
-                        text = text.rstrip() + "."
+                    text = re.sub(r'\.+', '.', text)
+                    # Ensure the section ends with a proper sentence
+                    if not re.search(r'[.!?]\s*$', text.strip()):
+                        text = text.rstrip() + '.'
+                    
+                    # Ensure the last sentence is complete by checking for common sentence structures
+                    sentences = re.split(r'(?<=[.!?])\s+', text)
+                    if sentences:
+                        last_sentence = sentences[-1]
+                        if len(last_sentence.split()) < 5:  # Arbitrary threshold for incomplete sentence
+                            sentences = sentences[:-1]  # Remove the incomplete sentence
+                            text = ' '.join(sentences).strip()
+                            if not text.endswith('.'):  # Ensure proper punctuation
+                                text += '.'
                     return text
-                
+
                 # Apply fixes to each section
                 case_overview = fix_truncated_text(case_overview)
                 court_decide = fix_truncated_text(court_decide)
                 outcomes = fix_truncated_text(outcomes)
-                
+
                 # Add emphasis to key legal concepts, dates, and monetary values
                 def add_emphasis_to_key_elements(text):
                     # Emphasize legal terms, section numbers, monetary values, and dates
-                    # Identify and bold legal acts and sections
                     text = re.sub(r'\b([A-Z][a-z]*(Act|Code|Rules|Constitution|Amendment|Section|Article|Chapter))\b', r'**\1**', text)
-                    text = re.sub(r'\b(Section|Article|Chapter)\s+(\d+[A-Z]?([(\d)]*)?)\b', r'**\1 \2**', text)
-                    
-                    # Bold case names
+                    text = re.sub(r'\b(Section|Article|Chapter)\s+(\d+[A-Z]?(\(\d+\))?)\b', r'**\1 \2**', text)
                     text = re.sub(r'\b(v\.|vs\.|versus)\b', r'**\1**', text)
-                    
-                    # Bold monetary values
-                    text = re.sub(r'\b(Rs\.\s*\d+[,\d]*(\.\d+)?)\b', r'**\1**', text)
-                    
-                    # Bold important dates
-                    text = re.sub(r'\b(\d{1,2}(st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4})\b', 
-                                r'**\1**', text)
-                    
+                    text = re.sub(r'\b(Rs\.\s*\d+[\,\d]*(\.\d+)?)\b', r'**\1**', text)
+                    text = re.sub(r'\b(\d{1,2}(st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4})\b', r'**\1**', text)
                     return text
-                
+
                 # Apply emphasis to each section
                 case_overview = add_emphasis_to_key_elements(case_overview)
                 court_decide = add_emphasis_to_key_elements(court_decide)
                 outcomes = add_emphasis_to_key_elements(outcomes)
-                
+
                 # Format the output with clear headings and separators (with bold headings)
                 result = "**Case Summary:**\n\n"
                 result += case_overview
@@ -541,9 +521,9 @@ Combined summaries:
                 result += court_decide
                 result += "\n\n\n**What are the outcomes:**\n\n"
                 result += outcomes
-                
+
                 return result
-            
+
             # Apply final validation
             final = _ensure_complete_sections(final)
             
