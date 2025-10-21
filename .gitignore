@@ -76,6 +76,7 @@ build/
 vectors/
 embeddings/
 models/
+!ai-service/src/models/
 checkpoints/
 cache/
 */cache/
