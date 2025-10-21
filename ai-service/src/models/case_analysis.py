@@ -276,15 +276,34 @@ class LegalDocSummarizer:
                 
         exec_prompt = f"""Using the combined summaries below, create an executive summary EXACTLY BETWEEN 500 and 600 WORDS TOTAL.
 
-Structure the output exactly into these three sections (headings must match exactly):
+Structure the output into these three sections, using EXACTLY these headings:
 
-What case is this?
-What did the court decide?
-What are the outcomes?
+Case Summary:
+What did the court decide:
+What are the outcomes:
 
-Under each heading, write a clear paragraph. Allocate words equally across all three sections (about 170-200 words per section). 
-Do NOT add any other headings, lists, notes or extra sections. Preserve factual accuracy and avoid repetition. 
-Total length MUST be between 500 and 600 words (not characters). Keep language formal and concise.
+Follow these rules PRECISELY:
+1. Each section MUST be EXACTLY ONE PARAGRAPH of 160-180 words with a clear beginning and end.
+2. Each section MUST focus only on its specific topic:
+   - First section: ONLY about the case background and constitutional context
+   - Second section: ONLY about the court's legal reasoning and principles
+   - Third section: ONLY about the specific orders and practical directives
+3. EMPHASIZE key legal terms by putting them in ** marks:
+   - Legal Acts (e.g., **Hindu Marriage Act**)
+   - Section numbers (e.g., **Section 125**)
+   - Case names (e.g., **v.** or **versus**)
+   - Monetary values (e.g., **Rs. 15,000**)
+   - Important dates
+3. Each section MUST be COMPLETELY SELF-CONTAINED with no references to other sections.
+4. Use simple, direct language with short sentences.
+5. For "Case Summary:" - Begin with "The case explains" (not "This Supreme Court case") and explain the background, parties, and issues.
+6. For "What did the court decide:" - Start with "The Court" (not specifically Supreme Court) and explain the legal principles.
+7. For "What are the outcomes:" - Start with "The Court ordered" and explain the specific orders.
+8. DO NOT use complex sentences or constructions.
+9. Aim for 160-180 words per section, allowing flexibility to complete sentences properly.
+10. NEVER end a section with ellipses (...) or incomplete sentences.
+11. ALWAYS end each paragraph with a complete sentence and proper punctuation.
+12. If a sentence won't fit within the word limit, rewrite it to be shorter rather than truncating it.
 
 Combined summaries:
 {combined}
@@ -301,9 +320,9 @@ Combined summaries:
             def _ensure_three_headings(text: str) -> str:
                 """Ensure text contains the three required headings. If not, split into 3 parts and add them."""
                 headings = [
-                    "What case is this?",
-                    "What did the court decide?",
-                    "What are the outcomes?",
+                    "Case Summary:",
+                    "What did the court decide:",
+                    "What are the outcomes:",
                 ]
 
                 # Normalize whitespace
@@ -322,7 +341,7 @@ Combined summaries:
                 # If too few sentences, return with headings prepended as simple wrapper
                 if len(sents) < 6:
                     # Wrap entire text under the first heading and add placeholders
-                    return f"{headings[0]}\n{text}\n\n{headings[1]}\n[See above]\n\n{headings[2]}\n[See above]"
+                    return f"{headings[0]}\n\n{text}\n\n\n{headings[1]}\n\n[See above]\n\n\n{headings[2]}\n\n[See above]"
 
                 # Distribute sentences into 3 buckets
                 n = len(sents)
@@ -331,12 +350,12 @@ Combined summaries:
                 c = sents[2*n//3:]
                 
                 # Ensure each section is approximately balanced
-                # Target roughly 170-200 words per section (500-600 total across 3 sections)
-                part_a = " ".join(a).strip()[:1200]  # Roughly 200 words max
-                part_b = " ".join(b).strip()[:1200]
-                part_c = " ".join(c).strip()[:1200]
+                # Target roughly 160-170 words per section (480-510 total across 3 sections)
+                part_a = " ".join(a).strip()[:1000]  # Roughly 170 words max
+                part_b = " ".join(b).strip()[:1000]
+                part_c = " ".join(c).strip()[:1000]
 
-                return f"{headings[0]}\n{part_a}\n\n{headings[1]}\n{part_b}\n\n{headings[2]}\n{part_c}"
+                return f"{headings[0]}\n\n{part_a}\n\n\n{headings[1]}\n\n{part_b}\n\n\n{headings[2]}\n\n{part_c}"
 
             def _word_count(text: str) -> int:
                 return len(text.split())
@@ -361,8 +380,17 @@ Combined summaries:
                 if wc < 500:
                     # Ask LLM to expand while preserving headings
                     expand_prompt = (
-                        "The executive summary below is TOO SHORT. Expand it to be between 500 and 600 words, "
-                        "preserving the three headings exactly and retaining the original meaning. Do not add other headings.\n\n" + final
+                        "The executive summary below is TOO SHORT. Expand it to be between 500 and 600 words. "
+                        "Preserve the three headings exactly. Ensure each section has a complete, self-contained paragraph. "
+                        "Make sure the 'What did the court decide' section clearly explains the legal reasoning and principles. "
+                        "Make sure the 'What are the outcomes' section clearly explains concrete orders and practical implications. "
+                        "IMPORTANT: Each section should be 160-180 words - allow flexibility to complete sentences properly. "
+                        "Start the first section with 'The case explains' rather than 'This Supreme Court case'. "
+                        "EMPHASIZE key legal terms by putting them in ** marks (Acts, Sections, case names, monetary values). "
+                        "ALWAYS end each paragraph with a complete sentence and proper punctuation. "
+                        "NEVER cut off sentences or end with ellipses - always complete the final thought. "
+                        "DO NOT prefix your response with any introduction. "
+                        "ONLY return the expanded summary with exactly the same formatting.\n\n" + final
                     )
                     try:
                         expanded = self.llm.predict(expand_prompt, callbacks=[callback])
@@ -373,8 +401,16 @@ Combined summaries:
                 else:
                     # Too long: ask LLM to shorten
                     shorten_prompt = (
-                        "The executive summary below is TOO LONG. Shorten it to be between 500 and 600 words, "
-                        "preserving the three headings exactly and the main points. Do not add or remove headings.\n\n" + final
+                        "The executive summary below is TOO LONG. Shorten it to be between 500 and 600 words. "
+                        "Preserve the three headings exactly and the main points. Do not add or remove headings. "
+                        "IMPORTANT: Each section should be 160-180 words - allow flexibility to complete sentences properly. "
+                        "Start the first section with 'The case explains' rather than 'This Supreme Court case'. "
+                        "EMPHASIZE key legal terms by putting them in ** marks (Acts, Sections, case names, monetary values). "
+                        "Ensure each section has a complete, self-contained paragraph with a proper conclusion. "
+                        "NEVER cut off sentences or end with ellipses - always complete the thought. "
+                        "Use simple sentences and direct language. NEVER end with ellipses or incomplete sentences. "
+                        "DO NOT prefix your response with any introduction. "
+                        "ONLY return the shortened summary with exactly the same formatting.\n\n" + final
                     )
                     try:
                         shortened = self.llm.predict(shorten_prompt, callbacks=[callback])
@@ -387,6 +423,33 @@ Combined summaries:
 
                 wc = _word_count(final)
 
+            # Final cleanup to remove any introductory text and markdown hashes
+            def _clean_final_output(text: str) -> str:
+                # Remove any markdown hashes from headings
+                cleaned_text = re.sub(r'#+\s*(Case Summary:|What did the court decide:|What are the outcomes:)', r'\1', text, flags=re.IGNORECASE)
+                
+                # Find the start of the first real heading
+                match = re.search(r'Case Summary:', cleaned_text, re.IGNORECASE)
+                if match:
+                    cleaned_text = cleaned_text[match.start():]
+                
+                # Remove any extra annotations that might be coming from the model
+                cleaned_text = re.sub(r'###\s*(Case Summary:|What did the court decide:|What are the outcomes:)', r'\1', cleaned_text, flags=re.IGNORECASE)
+                
+                # Clean up any duplicate headings
+                for heading in ['Case Summary:', 'What did the court decide:', 'What are the outcomes:']:
+                    pattern = f"({re.escape(heading)}.*?){re.escape(heading)}"
+                    cleaned_text = re.sub(pattern, r'\1', cleaned_text, flags=re.DOTALL|re.IGNORECASE)
+                
+                # Remove any "Case Summary" text that appears without the colon (model sometimes repeats the heading)
+                cleaned_text = re.sub(r'Case Summary\s+', '', cleaned_text)
+                cleaned_text = re.sub(r'What did the court decide\s+', '', cleaned_text)
+                cleaned_text = re.sub(r'What are the outcomes\s+', '', cleaned_text)
+                
+                return cleaned_text.strip()
+
+            final = _clean_final_output(final)
+
             # Final safety truncation if still too long
             if _word_count(final) > 600:
                 final = _shorten_to_limit(final, max_words=600)
@@ -396,6 +459,94 @@ Combined summaries:
             else:
                 print(f"   ✓ Summary word count: {_word_count(final)} words (target: 500-600)")
 
+            # Final validation - ensure proper section formatting and structure
+            def _ensure_complete_sections(text):
+                # Extract the three sections using regex
+                case_overview_match = re.search(r'Case Summary:(.*?)(?=What did the court decide:|$)', text, re.DOTALL)
+                court_decide_match = re.search(r'What did the court decide:(.*?)(?=What are the outcomes:|$)', text, re.DOTALL)
+                outcomes_match = re.search(r'What are the outcomes:(.*?)$', text, re.DOTALL)
+                
+                # Extract content and clean it
+                case_overview = case_overview_match.group(1).strip() if case_overview_match else ""
+                court_decide = court_decide_match.group(1).strip() if court_decide_match else ""
+                outcomes = outcomes_match.group(1).strip() if outcomes_match else ""
+                
+                # Fix incomplete sentences or truncated text (ending with "..")
+                def fix_truncated_text(text):
+                    # More aggressive handling of any form of ellipsis in the text
+                    # First, find if there are any ellipses in the last 30 characters
+                    last_part = text[-30:] if len(text) > 30 else text
+                    if '..' in last_part:
+                        # Find the last complete sentence that doesn't end with ellipses
+                        sentences = re.split(r'(?<=[.!?])\s+', text)
+                        if sentences:
+                            # Keep only sentences that don't end with ellipses
+                            clean_sentences = []
+                            for s in sentences:
+                                if not re.search(r'\.\.+\s*$', s.strip()):
+                                    clean_sentences.append(s)
+                                else:
+                                    # For the last truncated sentence, try to remove the ellipses
+                                    clean_s = re.sub(r'\.\.+\s*$', '.', s.strip())
+                                    if clean_s:
+                                        clean_sentences.append(clean_s)
+                            
+                            if clean_sentences:
+                                text = ' '.join(clean_sentences)
+                    
+                    # Remove trailing ellipses followed by proper sentence ending
+                    text = re.sub(r'\.\.+\s*[.!?]$', '.', text)
+                    # Replace trailing ellipses with a period if at the end of text
+                    text = re.sub(r'\.\.+\s*$', '.', text)
+                    # Replace any remaining ellipses in the text with periods
+                    text = re.sub(r'\.\.+', '.', text)
+                    # Make sure section doesn't end with a partial word or incomplete sentence
+                    if not re.search(r'[.!?]"\'\)]\s*$', text.strip()):
+                        text = text.rstrip() + "."
+                    return text
+                
+                # Apply fixes to each section
+                case_overview = fix_truncated_text(case_overview)
+                court_decide = fix_truncated_text(court_decide)
+                outcomes = fix_truncated_text(outcomes)
+                
+                # Add emphasis to key legal concepts, dates, and monetary values
+                def add_emphasis_to_key_elements(text):
+                    # Emphasize legal terms, section numbers, monetary values, and dates
+                    # Identify and bold legal acts and sections
+                    text = re.sub(r'\b([A-Z][a-z]*(Act|Code|Rules|Constitution|Amendment|Section|Article|Chapter))\b', r'**\1**', text)
+                    text = re.sub(r'\b(Section|Article|Chapter)\s+(\d+[A-Z]?([(\d)]*)?)\b', r'**\1 \2**', text)
+                    
+                    # Bold case names
+                    text = re.sub(r'\b(v\.|vs\.|versus)\b', r'**\1**', text)
+                    
+                    # Bold monetary values
+                    text = re.sub(r'\b(Rs\.\s*\d+[,\d]*(\.\d+)?)\b', r'**\1**', text)
+                    
+                    # Bold important dates
+                    text = re.sub(r'\b(\d{1,2}(st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4})\b', 
+                                r'**\1**', text)
+                    
+                    return text
+                
+                # Apply emphasis to each section
+                case_overview = add_emphasis_to_key_elements(case_overview)
+                court_decide = add_emphasis_to_key_elements(court_decide)
+                outcomes = add_emphasis_to_key_elements(outcomes)
+                
+                # Format the output with clear headings and separators (with bold headings)
+                result = "**Case Summary:**\n\n"
+                result += case_overview
+                result += "\n\n\n**What did the court decide:**\n\n"
+                result += court_decide
+                result += "\n\n\n**What are the outcomes:**\n\n"
+                result += outcomes
+                
+                return result
+            
+            # Apply final validation
+            final = _ensure_complete_sections(final)
+            
             # If still shorter than 500, leave as-is but note (do not modify content further)
             return final
         except Exception as e:
