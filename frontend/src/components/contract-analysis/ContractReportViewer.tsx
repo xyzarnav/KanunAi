@@ -5,16 +5,16 @@ import styles from '../../styles/viewer.module.css';
 import { ColorfulMarkdown } from './ColorfulMarkdown';
 
 interface ContractReportViewerProps {
-  reportMd: string;
+  reportMd?: string;
   executiveSummary: string;
   detailedAnalysis?: string;
   contractTitle: string;
-  activeTab: 'report' | 'summary' | 'detailed';
-  setActiveTab: (tab: 'report' | 'summary' | 'detailed') => void;
+  activeTab: 'summary' | 'detailed';
+  setActiveTab: (tab: 'summary' | 'detailed') => void;
 }
 
 export default function ContractReportViewer({
-  reportMd,
+  reportMd = '',
   executiveSummary,
   detailedAnalysis = '',
   contractTitle,
@@ -31,8 +31,6 @@ export default function ContractReportViewer({
     } else if (activeTab === 'detailed') {
       content = detailedAnalysis || '';
       filename = 'detailed_chunk_analysis';
-    } else {
-      content = reportMd;
     }
     
     if (!content) return;
@@ -47,16 +45,12 @@ export default function ContractReportViewer({
 
   const printReport = () => {
     let content = '';
-    let title = 'Contract Analysis Report';
+    let title = activeTab === 'summary' ? 'Executive Summary' : 'Detailed Chunk Analysis';
     
     if (activeTab === 'summary') {
       content = executiveSummary;
-      title = 'Executive Summary';
     } else if (activeTab === 'detailed') {
       content = detailedAnalysis || '';
-      title = 'Detailed Chunk Analysis';
-    } else {
-      content = reportMd;
     }
     
     if (!content) return;
@@ -83,8 +77,6 @@ export default function ContractReportViewer({
       content = executiveSummary;
     } else if (activeTab === 'detailed') {
       content = detailedAnalysis || '';
-    } else {
-      content = reportMd;
     }
     
     if (!content) return;
@@ -102,8 +94,6 @@ export default function ContractReportViewer({
       content = executiveSummary;
     } else if (activeTab === 'detailed') {
       content = detailedAnalysis;
-    } else {
-      content = reportMd;
     }
     
     // Remove emojis from content using a more compatible pattern
@@ -119,16 +109,6 @@ export default function ContractReportViewer({
         <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex gap-2 flex-wrap lg:flex-nowrap">
-              <button
-                onClick={() => setActiveTab('report')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                  activeTab === 'report'
-                    ? 'bg-blue-500 text-white '
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
-                }`}
-              >
-                Full Report
-              </button>
               <button
                 onClick={() => setActiveTab('summary')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${

@@ -24,12 +24,11 @@ export default function ContractAnalysis() {
 
   const [dragActive, setDragActive] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [reportMd, setReportMd] = useState<string>('');
   const [executiveSummary, setExecutiveSummary] = useState<string>('');
   const [detailedAnalysis, setDetailedAnalysis] = useState<string>('');
   const [session, setSession] = useState<string | null>(null);
   const [chatReady, setChatReady] = useState(false);
-  const [activeTab, setActiveTab] = useState<'report' | 'summary' | 'detailed'>('report');
+  const [activeTab, setActiveTab] = useState<'summary' | 'detailed'>('summary');
 
   useEffect(() => {
     // Listen for floating dock events
@@ -150,14 +149,12 @@ export default function ContractAnalysis() {
       }
 
       const contentType = resp.headers.get('content-type') || '';
-      const data = contentType.includes('application/json') ? await resp.json() : { report: await resp.text() };
+      const data = contentType.includes('application/json') ? await resp.json() : { summary: await resp.text() };
 
-      const report = (data as any)?.report ?? '';
       const summary = (data as any)?.summary ?? '';
       const detailed = (data as any)?.detailed ?? '';
       const sess = (data as any)?.session ?? null;
 
-      setReportMd(report);
       setExecutiveSummary(summary);
       setDetailedAnalysis(detailed);
       setSession(sess);
@@ -194,12 +191,12 @@ export default function ContractAnalysis() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start relative">
           {(() => {
             console.log('[ContractAnalysis] Render check:', {
-              reportMd: !!reportMd,
+              executiveSummary: !!executiveSummary,
               chatReady,
               session: !!session,
             });
             
-            return reportMd && chatReady && session ? (
+            return executiveSummary && chatReady && session ? (
               <ContractChatBot session={session} />
             ) : (
               <>
@@ -232,7 +229,6 @@ export default function ContractAnalysis() {
           })()}
 
           <ContractReportViewer
-            reportMd={reportMd}
             executiveSummary={executiveSummary}
             detailedAnalysis={detailedAnalysis}
             contractTitle={contractTitle}

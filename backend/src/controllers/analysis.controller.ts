@@ -118,7 +118,6 @@ export async function summarizeCase(req: Request, res: Response) {
             .join('\n\n---\n\n');
           
           return res.json({
-            report: parsed.comprehensive_report ?? "",
             summary: parsed.executive_summary ?? "",
             detailed: formattedDetailedAnalysis,
             session: parsed.session
