@@ -81,7 +81,7 @@ cache/
 */cache/
 */output/
 ai-service/output/
-ai-service/models/
+# ai-service/models/
 ai-service/vectors/
 
 # Additional caches and outputs
