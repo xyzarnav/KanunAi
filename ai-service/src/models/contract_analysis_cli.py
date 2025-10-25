@@ -87,6 +87,20 @@ def main():
                         pages_per_chunk=chunk_size,
                         output_dir=output_dir
                     )
+                except ValueError as e:
+                    error_message = str(e)
+                    if "does not appear to be a contract" in error_message:
+                        print(json.dumps({
+                            "error": "NOT_A_CONTRACT",
+                            "message": "The provided document does not appear to be a contract. Please verify and upload a valid contract document.",
+                            "session": None
+                        }))
+                    else:
+                        print(json.dumps({
+                            "error": f"Analysis error: {error_message}",
+                            "session": None
+                        }))
+                    sys.exit(1)
                 except Exception as e:
                     print(json.dumps({
                         "error": f"Analysis error: {str(e)}",

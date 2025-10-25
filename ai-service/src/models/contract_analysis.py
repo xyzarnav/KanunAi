@@ -101,6 +101,35 @@ class ContractAnalyzer:
 
         except Exception as e:
             raise ValueError(f"Error loading PDF: {e}")
+            
+    def is_contract_document(self) -> bool:
+        """
+        Check if the loaded document appears to be a contract based on key indicators
+        Returns True if document is likely a contract, False otherwise
+        """
+        if not self.document_text:
+            raise ValueError("No document loaded. Run load_contract() first.")
+            
+        # Common contract keywords and phrases to look for
+        contract_indicators = [
+            "agreement", "contract", "terms and conditions", 
+            "parties", "hereby agree", "obligations", "shall",
+            "hereinafter", "whereas", "in witness whereof",
+            "covenant", "undertaking", "clause", "provision",
+            "executed", "binding agreement", "consideration",
+            "term of agreement", "termination", "governing law"
+        ]
+        
+        # Check if document contains contract-specific language
+        # Convert to lowercase for case-insensitive matching
+        document_lower = self.document_text.lower()
+        
+        # Count the number of contract indicators found
+        indicator_count = sum(1 for indicator in contract_indicators 
+                             if indicator in document_lower)
+        
+        # If document has at least 3 contract indicators, it's likely a contract
+        return indicator_count >= 3
     
     
     def chunk_contract(self, pdf_path: str, pages_per_chunk: int = 2):
@@ -472,6 +501,10 @@ Make it scannable with bullet points and clear sections."""
 
         # Step 1: Load contract
         self.load_contract(pdf_path)
+        
+        # Step 1.5: Verify document is a contract
+        if not self.is_contract_document():
+            raise ValueError("The provided document does not appear to be a contract. Please verify the document and try again.")
 
         # Step 2: Chunk contract
         self.chunk_contract(pdf_path=pdf_path, pages_per_chunk=pages_per_chunk)
