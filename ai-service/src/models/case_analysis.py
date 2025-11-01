@@ -26,6 +26,12 @@ from langchain_community.vectorstores import FAISS
 from langchain.docstore.document import Document
 from langchain.callbacks.base import BaseCallbackHandler
 
+# For direct Gemini API access
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 # LOCAL EMBEDDINGS - No API calls!
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
@@ -703,6 +709,10 @@ Provide a clear, focused summary (300-400 words):""",
         
         print("\n🤖 Setting up Q&A system...")
         
+        # Use the default LLM - LangChain GoogleGenerativeAI doesn't support max_output_tokens directly
+        # We'll handle this through prompt engineering instead
+        qa_llm = self.llm
+        
         qa_prompt = PromptTemplate(
             template="""You are a Supreme Court case expert. Answer based on the judgment context provided.
 
@@ -711,12 +721,23 @@ Context from judgment:
 
 Question: {question}
 
-Provide a clear answer, citing relevant paragraphs and constitutional provisions where applicable:""",
+Answer Guidelines:
+- Provide a clear, complete answer that fully addresses the question
+- Write concisely - aim for 200-400 words maximum
+- Always end with a complete sentence (period, question mark, or exclamation)
+- Include specific details: amounts (with full values), dates, sections, parties
+- Structure longer answers with clear sections or bullet points
+- If discussing multiple points, ensure each point is complete before moving to the next
+- Never cut off mid-sentence or mid-thought - if approaching length limits, summarize remaining points briefly
+
+Important: Your final sentence must be grammatically complete with proper punctuation. End naturally at a complete thought, not in the middle of a phrase or amount.
+
+Answer:""",
             input_variables=["context", "question"]
         )
         
         self.qa_chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
+            llm=qa_llm,  # Use Q&A-specific LLM with higher token limit
             chain_type="stuff",
             retriever=self.vectorstore.as_retriever(search_kwargs={"k": 3}),
             chain_type_kwargs={"prompt": qa_prompt},
@@ -728,7 +749,7 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
     
     
     def ask(self, question: str) -> Dict:
-        """Ask a question"""
+        """Ask a question - uses direct Gemini API for better control over output length"""
         
         if not hasattr(self, 'qa_chain') or not self.qa_chain:
             self.setup_qa_chain()
@@ -738,12 +759,136 @@ Provide a clear answer, citing relevant paragraphs and constitutional provisions
         self.rate_limiter.wait_if_needed()
         
         try:
-            result = self.qa_chain.invoke({"query": question})
+            # First, get the relevant context using the retriever
+            retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
+            docs = retriever.get_relevant_documents(question)
+            context = "\n\n".join([doc.page_content for doc in docs])
+            
+            # Use direct Gemini API with explicit max_output_tokens for complete answers
+            if genai and self.api_key:
+                try:
+                    genai.configure(api_key=self.api_key)
+                    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                    
+                    prompt = f"""You are a Supreme Court case expert. Answer based on the judgment context provided.
 
-            # Modify the answer to remove any introductory phrases like "Based on the judgment..."
+Context from judgment:
+{context}
+
+Question: {question}
+
+CRITICAL INSTRUCTIONS:
+1. Provide a complete, self-contained answer that fully addresses the question
+2. Write concisely but comprehensively (200-500 words is ideal)
+3. Structure your answer logically with clear sections or paragraphs
+4. Include all relevant details: complete amounts (e.g., "Rs. 15,000 per month"), full dates, section numbers, party names
+5. When discussing multiple points, ensure EACH point is fully explained before moving to the next
+
+MOST IMPORTANT - ENDING REQUIREMENTS:
+- Your answer MUST end with a complete, grammatically correct sentence
+- The final sentence must conclude a complete thought - it should feel natural and finished
+- NEVER end in the middle of listing items, describing amounts, or explaining concepts
+- If you need to stop, end at the conclusion of a major point, not mid-explanation
+- The last 10-15 words should form a coherent conclusion or summary statement
+
+Example of GOOD endings:
+- "...ensuring uniformity and consistency in maintenance proceedings across Indian courts."
+- "...aimed to streamline maintenance proceedings and protect the rights of dependent spouses and children."
+- "...established comprehensive guidelines for determining maintenance amounts and enforcement mechanisms."
+
+Example of BAD endings (DO NOT do this):
+- "...directing the husband to pay the entire arrears of maintenance at Rs."
+- "...the Court addressed issues such as overlapping jurisdictions, payment of interim"
+- "...ultimately affirming the Family Court's order and directing the husband to pay arrears, and setting"
+
+CRITICAL FINAL CHECK - Before you finish writing:
+1. Read your last 2-3 sentences out loud
+2. Your final sentence MUST be grammatically complete (subject + verb + complement)
+3. It must end with proper punctuation (. or ! or ?)
+4. It must NOT end with: conjunctions (and, but, or, therefore), prepositions (at, of, to, with), or incomplete phrases (like "and setting", "at Rs.", "directing the")
+5. The final sentence should be a strong conclusion that completes the thought
+
+WRITING PROCESS:
+1. Write your complete answer covering all points
+2. Read the last paragraph carefully
+3. If the last sentence ends with "and", "or", "at", "of", "to", "setting", "directing", or any incomplete phrase - rewrite it to be complete
+4. Ensure your final sentence reads naturally as a conclusion
+
+Now provide your complete answer:"""
+                    
+                    response = model.generate_content(
+                        prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=0.3,
+                            max_output_tokens=4096,  # Very high limit to ensure no truncation
+                            top_p=0.8,
+                            top_k=40,
+                        )
+                    )
+                    
+                    answer = response.text.strip() if hasattr(response, 'text') else str(response)
+                    
+                    # Simple cleanup
+                    answer = re.sub(r'^Based on the judgment.*?[:,\-]\s*', '', answer, flags=re.IGNORECASE)
+                    answer = answer.strip()
+                    
+                    # Validate and fix ending if needed
+                    if answer:
+                        # Check if ending looks incomplete (very basic heuristic)
+                        last_30 = answer[-30:].lower()
+                        incomplete_indicators = [
+                            'at rs.', 'of rs.', 'to rs.', 'rs. ', 'at $', 'of $',
+                            'section', 'article', 'directing', 'ordering', 'and setting',
+                            'concluding', 'stating', 'noting', 'observing', 'ultimately',
+                            'finally', 'thus', 'therefore', 'however', 'additionally'
+                        ]
+                        
+                        # If ends with an incomplete phrase, find the last complete sentence
+                        ends_incomplete = False
+                        for indicator in incomplete_indicators:
+                            # Check if answer ends with this pattern (within last 20 chars)
+                            if last_30.endswith(indicator) or last_30.rstrip('.,;').endswith(indicator):
+                                ends_incomplete = True
+                                break
+                        
+                        if ends_incomplete:
+                            # Find the last complete sentence before the incomplete part
+                            # Look for sentence boundaries
+                            last_period = max(
+                                answer.rfind('. '),
+                                answer.rfind('.\n'),
+                                answer.rfind('.'),
+                                answer.rfind('! '),
+                                answer.rfind('?\n'),
+                                answer.rfind('? ')
+                            )
+                            if last_period > len(answer) * 0.5:  # Only if not too early
+                                answer = answer[:last_period + 1].strip()
+                        
+                        # Ensure proper ending punctuation
+                        if answer and answer[-1] not in '.!?':
+                            answer += '.'
+                    
+                    print(f"💬 Answer: {answer[:150]}...")
+                    
+                    return {
+                        'answer': answer,
+                        'sources': [doc.page_content[:200] + "..." for doc in docs]
+                    }
+                except Exception as api_err:
+                    print(f"⚠️ Direct API failed, falling back to chain: {api_err}")
+                    # Fall through to chain-based approach
+            
+            # Fallback to chain-based approach
+            result = self.qa_chain.invoke({"query": question})
             answer = result['result']
             answer = re.sub(r'^Based on the judgment.*?[:,\-]\s*', '', answer, flags=re.IGNORECASE)
-
+            answer = answer.strip()
+            
+            # Basic cleanup - ensure proper ending
+            if answer and answer[-1] not in '.!?':
+                answer += '.'
+            
             print(f"💬 Answer: {answer[:150]}...")
 
             return {

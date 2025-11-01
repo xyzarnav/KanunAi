@@ -23,6 +23,107 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
     const [loading, setLoading] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * Detects incomplete endings and truncates to the last complete sentence
+     * AGGRESSIVE APPROACH: Find last sentence and remove ANYTHING that looks like JSON
+     */
+    const ensureCompleteEnding = (text: string): string => {
+        if (!text || text.trim().length === 0) return text;
+
+        let trimmed = text.trim();
+        
+        // FIRST: Aggressively remove JSON patterns (try multiple passes)
+        // Pattern 1: Remove ", "sources": [...]" anywhere in the text
+        trimmed = trimmed.replace(/[,\s]*["']sources["']?\s*:\s*\[[^\]]*\]/gi, '');
+        // Pattern 2: Remove any trailing quotes, commas, JSON structures
+        trimmed = trimmed.replace(/["']\s*,\s*["']sources.*$/i, '');
+        trimmed = trimmed.replace(/[,;\s]*["']sources.*$/i, '');
+        trimmed = trimmed.replace(/\[.*?\]\s*$/g, '');
+        trimmed = trimmed.replace(/\{.*?\}\s*$/g, '');
+        trimmed = trimmed.replace(/["'],\s*\{.*$/i, '');
+        // Pattern 3: Remove any content after quote-comma-quote pattern
+        trimmed = trimmed.replace(/["']\s*,\s*["'].*$/i, '');
+        trimmed = trimmed.trim();
+        
+        // SECOND: Find the last sentence-ending punctuation
+        // Check for period/question/exclamation followed by space OR directly by comma/quote (JSON)
+        const lastPeriodSpace = trimmed.lastIndexOf('. ');
+        const lastQuestionSpace = trimmed.lastIndexOf('? ');
+        const lastExclamationSpace = trimmed.lastIndexOf('! ');
+        const lastPeriodNewline = trimmed.lastIndexOf('.\n');
+        const lastQuestionNewline = trimmed.lastIndexOf('?\n');
+        const lastExclamationNewline = trimmed.lastIndexOf('!\n');
+        
+        // Also check for period directly followed by comma/quote (no space - JSON case)
+        const lastPeriodComma = trimmed.lastIndexOf('.,');
+        const lastPeriodQuote = trimmed.lastIndexOf('."');
+        const lastPeriodQuoteSingle = trimmed.lastIndexOf(".'");
+        
+        let lastPunct = Math.max(
+            lastPeriodSpace, lastQuestionSpace, lastExclamationSpace,
+            lastPeriodNewline, lastQuestionNewline, lastExclamationNewline,
+            lastPeriodComma, lastPeriodQuote, lastPeriodQuoteSingle
+        );
+        
+        // If we found a sentence boundary
+        if (lastPunct >= 0 && lastPunct > trimmed.length * 0.15) {
+            // Check what character follows the punctuation
+            const charAfter = trimmed.charAt(lastPunct + 1);
+            
+            // If it's a space or newline (normal sentence end)
+            if (charAfter === ' ' || charAfter === '\n') {
+                const afterPunct = trimmed.substring(lastPunct + 2).trim();
+                if (!afterPunct || afterPunct.length === 0) {
+                    return trimmed.substring(0, lastPunct + 1).trim();
+                }
+                // Check if JSON follows
+                if (afterPunct.match(/^[,;\s]*["']/) ||
+                    afterPunct.match(/["']sources/i) ||
+                    afterPunct.match(/[:\[\{]/) ||
+                    (afterPunct.length < 30 && afterPunct.match(/["',;]/))) {
+                    return trimmed.substring(0, lastPunct + 1).trim();
+                }
+            }
+            // If it's a comma or quote directly after (JSON case: ".", "sources" or ".", "sources")
+            else if (charAfter === ',' || charAfter === '"' || charAfter === "'") {
+                // Definitely JSON - truncate immediately
+                return trimmed.substring(0, lastPunct + 1).trim();
+            }
+        }
+        
+        // Fallback: Find any punctuation and check what follows
+        const lastPeriod = trimmed.lastIndexOf('.');
+        const lastQuestion = trimmed.lastIndexOf('?');
+        const lastExclamation = trimmed.lastIndexOf('!');
+        lastPunct = Math.max(lastPeriod, lastQuestion, lastExclamation);
+        
+        if (lastPunct >= 0 && lastPunct > trimmed.length * 0.15) {
+            const afterPunct = trimmed.substring(lastPunct + 1).trim();
+            // If what comes after is suspicious (JSON-like), truncate
+            if (afterPunct.length > 0 && 
+                (afterPunct.match(/^[,;\s]*["']/) ||
+                 afterPunct.match(/["']sources/i) ||
+                 afterPunct.match(/[:\[\{]/) ||
+                 (afterPunct.length < 30 && afterPunct.match(/["',;]/)))) {
+                return trimmed.substring(0, lastPunct + 1).trim();
+            }
+        }
+        
+        // THIRD: Final cleanup - remove any remaining JSON-looking content
+        trimmed = trimmed.replace(/[,\s]*["']sources.*$/i, '');
+        trimmed = trimmed.replace(/["']\s*,\s*["'].*$/i, '');
+        trimmed = trimmed.replace(/\[.*?\]\s*$/g, '');
+        trimmed = trimmed.replace(/\{.*?\}\s*$/g, '');
+        trimmed = trimmed.trim();
+        
+        // FOURTH: Ensure it ends with proper punctuation
+        if (trimmed && !/[.!?]$/.test(trimmed)) {
+            trimmed = trimmed + '.';
+        }
+
+        return trimmed;
+    };
+
     useEffect(() => {
         // Scroll to bottom when messages change or loading state changes
         if (listRef.current) {
@@ -68,11 +169,15 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
                         answer = raw.answer;
                     }
                 } catch {}
-                setMessages((m) => [...m, { role: "assistant", content: answer }]);
+                // Ensure the answer ends at a complete sentence
+                const cleanAnswer = ensureCompleteEnding(answer);
+                setMessages((m) => [...m, { role: "assistant", content: cleanAnswer }]);
                 return;
             }
             const data = (await resp.json()) as { answer: string; sources?: string[] };
-            setMessages((m) => [...m, { role: "assistant", content: data.answer || "(no answer)" }]);
+            // Ensure the answer ends at a complete sentence, not mid-thought
+            const cleanAnswer = ensureCompleteEnding(data.answer || "(no answer)");
+            setMessages((m) => [...m, { role: "assistant", content: cleanAnswer }]);
         } catch (e: any) {
             setMessages((m) => [...m, { role: "assistant", content: `Sorry, something went wrong.` }]);
         } finally {

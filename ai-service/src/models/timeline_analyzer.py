@@ -52,6 +52,8 @@ class DateExtractor:
         'written_short': r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[.]*\s+(\d{1,2}),?\s+(\d{4})\b',
         # Written format: 15 January 2024 or 15 Jan 2024
         'written_eu': r'\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[.]*\s+(\d{4})\b',
+        # Written format with ordinal: 15th October 2024, 1st January 2024, 2nd March 2024, 3rd April 2024
+        'written_ordinal': r'\b(\d{1,2})(?:st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[.]*\s+(\d{4})\b',
     }
     
     MONTH_MAP = {
@@ -130,16 +132,18 @@ class DateExtractor:
     
     @classmethod
     def _parse_written_date(cls, groups: Tuple[str, ...], format_key: str) -> Optional[datetime]:
-        """Parse written date formats (Jan 15, 2024 style)"""
+        """Parse written date formats (Jan 15, 2024 style or 15th October 2024 style)"""
         try:
-            if format_key == 'written_eu':
+            if format_key in ('written_eu', 'written_ordinal'):
                 day, month_str, year = groups
             else:
                 month_str, day, year = groups
             
             month_str_clean = month_str.rstrip('.')
             month = cls.MONTH_MAP.get(month_str_clean.lower(), 0)
-            return datetime(int(year), month, int(day)) if month > 0 else None
+            # For ordinal dates, day already has the ordinal suffix removed by regex capture group
+            day_num = int(day)
+            return datetime(int(year), month, day_num) if month > 0 else None
         except (ValueError, TypeError):
             return None
     
@@ -158,7 +162,7 @@ class DateExtractor:
                 return cls._parse_numeric_date(groups, pattern_type)
             
             # Written formats
-            if pattern_type in ('written_long', 'written_short', 'written_eu'):
+            if pattern_type in ('written_long', 'written_short', 'written_eu', 'written_ordinal'):
                 return cls._parse_written_date(groups, pattern_type)
             
             return None
@@ -178,12 +182,30 @@ class DateExtractor:
         return line_dates
     
     @classmethod
-    def _expand_context(cls, lines: List[str], target_line_num: int, window: int = 2) -> str:
-        """Expand context around a date by including surrounding lines"""
+    def _expand_context(cls, lines: List[str], target_line_num: int, window: int = 4) -> str:
+        """Expand context around a date by including surrounding lines
+        Increased window from 2 to 4 to capture more complete sentences and prevent truncation"""
         start_idx = max(0, target_line_num - 1 - window)
         end_idx = min(len(lines), target_line_num + window)
         context_lines = lines[start_idx:end_idx]
-        return ' '.join(line.strip() for line in context_lines if line.strip())
+        # Join lines but preserve sentence boundaries - try to end at sentence boundaries if possible
+        context = ' '.join(line.strip() for line in context_lines if line.strip())
+        # If context ends mid-sentence, try to extend to next sentence boundary
+        # But limit total length to avoid excessive context
+        if len(context) > 0 and not context.rstrip().endswith(('.', '!', '?', ';')) and end_idx < len(lines):
+            # Try to include next line if it helps complete the sentence
+            next_lines = lines[end_idx:end_idx+2]
+            for next_line in next_lines:
+                next_line = next_line.strip()
+                if not next_line:
+                    continue
+                # Check if adding this line would help complete a sentence
+                extended = context + ' ' + next_line
+                if len(extended) < 1000:  # Reasonable limit
+                    context = extended
+                    if context.rstrip().endswith(('.', '!', '?', ';')):
+                        break
+        return context
     
     @classmethod
     def extract_dates_from_text(cls, text: str) -> List[Tuple[datetime, str, int]]:
@@ -214,8 +236,8 @@ class DateExtractor:
 
             # Expand context and filter duplicates
             for date_obj, context, num in line_dates:
-                # Use expanded context for better classification
-                expanded_context = cls._expand_context(lines, num, window=2)
+                # Use expanded context for better classification - increased window to capture complete sentences
+                expanded_context = cls._expand_context(lines, num, window=4)
                 date_ctx_key = (date_obj.isoformat(), expanded_context)
                 if date_ctx_key not in seen_dates:
                     seen_dates.add(date_ctx_key)
@@ -246,6 +268,10 @@ class DateExtractor:
                 r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}',
                 # Abbrev month
                 r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4}',
+                # Day Month Year format (e.g., 15 January 2024)
+                r'\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{4}',
+                # Ordinal dates: 15th October 2024, 1st January 2024, 2nd March 2024, 3rd April 2024
+                r'\d{1,2}(?:st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{4}',
                 # ISO / numeric sequences
                 r'\b\d{4}-\d{2}-\d{2}\b',
                 r'\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b',
@@ -260,10 +286,19 @@ class DateExtractor:
                     context = text[snippet_start:snippet_end].strip().replace('\n', ' ')
                     # try to normalize by testing each known pattern type
                     date_obj = None
-                    # try each DATE_PATTERNS to normalize
+                    candidate = m.group(0)
+                    
+                    # Clean up ordinal suffixes for parsing (15th -> 15)
+                    candidate_clean = re.sub(r'(\d{1,2})(?:st|nd|rd|th)', r'\1', candidate)
+                    
+                    # try each DATE_PATTERNS to normalize (try both original and cleaned)
                     for ptype in cls.DATE_PATTERNS.keys():
-                        candidate = m.group(0)
                         parsed = cls.normalize_date_string(candidate, ptype)
+                        if parsed:
+                            date_obj = parsed
+                            break
+                        # Also try cleaned version for ordinal dates
+                        parsed = cls.normalize_date_string(candidate_clean, ptype)
                         if parsed:
                             date_obj = parsed
                             break
@@ -272,15 +307,22 @@ class DateExtractor:
                     if not date_obj:
                         try:
                             # Try common numeric ordering heuristics
-                            candidate = m.group(0)
                             # replace slashes with dashes for datetime.fromisoformat attempt where possible
-                            c = candidate.replace('/', '-').replace('.', '')
+                            c = candidate_clean.replace('/', '-').replace('.', '')
                             # try yyyy-mm-dd first
                             if re.match(r'^\d{4}-\d{2}-\d{2}$', c):
                                 date_obj = datetime.fromisoformat(c)
                             else:
-                                # try parse month name formats - let datetime try
-                                date_obj = datetime.strptime(candidate, '%B %d, %Y')
+                                # try parse month name formats - handle ordinal dates
+                                # Remove ordinal suffix and try parsing
+                                cleaned_for_parse = re.sub(r'(\d{1,2})(?:st|nd|rd|th)', r'\1', candidate_clean)
+                                # Try multiple formats
+                                for fmt in ['%B %d, %Y', '%d %B %Y', '%B %d %Y', '%d %B %Y']:
+                                    try:
+                                        date_obj = datetime.strptime(cleaned_for_parse, fmt)
+                                        break
+                                    except ValueError:
+                                        continue
                         except Exception:
                             date_obj = None
 
@@ -472,29 +514,698 @@ class TimelineAnalyzer:
             raise ValueError(f"Failed to load PDF: {str(e)}")
     
     def _classify_event(self, context_line: str) -> str:
-        """Classify an event based on its context"""
+        """Classify an event based on its context with improved specificity"""
+        context_lower = context_line.lower()
         
-        event_type = 'Other'
-        max_keyword_count = 0
+        # Enhanced classification with more specific event names
+        # Check for judgment/order keywords first (higher priority)
+        if any(kw in context_lower for kw in ['supreme court', 'sc']):
+            if any(kw in context_lower for kw in ['judgment', 'decided', 'order', 'affirmed']):
+                return 'Supreme Court Judgment'
+            return 'Supreme Court Order'
         
-        for typ, keywords in self.EVENT_KEYWORDS.items():
-            # Count matching keywords
-            keyword_count = sum(1 for k in keywords if k.lower() in context_line.lower())
-            if keyword_count > max_keyword_count:
-                if DateExtractor._validate_event_type(typ, context_line):
-                    event_type = typ.title()
-                    max_keyword_count = keyword_count
+        if any(kw in context_lower for kw in ['high court', 'hc']):
+            if any(kw in context_lower for kw in ['judgment', 'decided', 'order', 'affirmed', 'dismissed']):
+                return 'High Court Judgment'
+            return 'High Court Order'
+        
+        if 'family court' in context_lower:
+            if any(kw in context_lower for kw in ['order', 'awarded', 'directed', 'maintenance']):
+                return 'Family Court Order'
+        
+        # Maintenance-related events
+        if 'maintenance' in context_lower:
+            if 'interim' in context_lower:
+                return 'Interim Maintenance Order'
+            return 'Maintenance Order'
+        
+        # Amendment/Legislative events
+        if any(kw in context_lower for kw in ['amendment', 'amended', 'inserted', 'w.e.f', 'with effect']):
+            if 'section' in context_lower:
+                return 'Legislative Amendment'
+            return 'Statutory Amendment'
+        
+        # Appeal events
+        if any(kw in context_lower for kw in ['appeal', 'appealed', 'appellate']):
+            if 'criminal appeal' in context_lower:
+                return 'Criminal Appeal'
+            if 'civil appeal' in context_lower:
+                return 'Civil Appeal'
+            return 'Appeal Filing'
+        
+        # Writ/Revision events
+        if any(kw in context_lower for kw in ['writ petition', 'special leave petition', 'slp']):
+            return 'Writ Petition'
+        if any(kw in context_lower for kw in ['revision', 'crl. rev']):
+            return 'Revision Petition'
+        
+        # Judgment/Order events
+        if any(kw in context_lower for kw in ['judgment', 'decided', 'pronounced']):
+            return 'Court Judgment'
+        
+        if any(kw in context_lower for kw in ['order dated', 'ordered', 'directed', 'awarded']):
+            return 'Court Order'
+        
+        # Filing events
+        if any(kw in context_lower for kw in ['filed', 'application filed', 'petition filed']):
+            return 'Filing'
+        
+        # Compliance/Arrears
+        if any(kw in context_lower for kw in ['arrears', 'payment', 'compliance', 'affidavit']):
+            if 'arrears' in context_lower or 'payment' in context_lower:
+                return 'Payment/Arrears'
+            return 'Compliance Filing'
+        
+        # Hearing events
+        if any(kw in context_lower for kw in ['hearing', 'heard', 'trial']):
+            return 'Hearing'
+        
+        # Settlement
+        if any(kw in context_lower for kw in ['settlement', 'settled', 'mediation']):
+            return 'Settlement'
+        
+        # Dismissal
+        if any(kw in context_lower for kw in ['dismissed', 'withdrawn', 'quashed']):
+            return 'Case Dismissal'
+        
+        # Interim orders
+        if 'interim' in context_lower:
+            return 'Interim Order'
+        
+        # Default to a more specific name based on context patterns
+        if 'section' in context_lower:
+            return 'Statutory Reference'
+        
+        if 'court' in context_lower:
+            return 'Court Proceeding'
+        
+        # Last resort - use a descriptive name instead of "Other"
+        return 'Legal Event'
+        
+    def _create_summary_from_context(self, date_obj: datetime, context_line: str, event_type: str) -> str:
+        """Generate a natural 1-4 line summary from context (no dates, natural language, works for any legal document)"""
+        import re
+        
+        # Clean context aggressively - remove all citations and noise
+        clean_context = context_line.replace('--- PAGE BREAK ---', ' ').replace('PAGE BREAK', ' ')
+        clean_context = re.sub(r'MANU/[^\s]+', '', clean_context)  # Remove citations
+        clean_context = re.sub(r'https?://\S+', '', clean_context)  # Remove URLs
+        clean_context = re.sub(r'\d+\s+Decided by.*?High Court', '', clean_context, flags=re.IGNORECASE)  # Remove "X Decided by..."
+        clean_context = re.sub(r'\d+\s+[A-Z]\.\s+\w+.*?v\.\s+.*?\d{4}', '', clean_context)  # Remove case citations
+        clean_context = re.sub(r'(?:Criminal|Civil)\s+Appeal\s+No\.?\s*\d+.*?of \d{4}', '', clean_context)  # Remove appeal citations
+        clean_context = re.sub(r'IN THE.*?COURT.*?\d{4}', '', clean_context, flags=re.IGNORECASE | re.DOTALL)
+        clean_context = re.sub(r'Decided On:.*?\d{2}\.\d{2}\.\d{4}', '', clean_context)  # Remove "Decided On: date"
+        clean_context = re.sub(r'decided vide.*?\d{4}', '', clean_context, flags=re.IGNORECASE)
+        clean_context = re.sub(r'\d{1,2}\.\d{1,2}\.\d{4}', '', clean_context)  # Remove all dates from context
+        clean_context = ' '.join(clean_context.split())  # Normalize whitespace
+        
+        context_lower = clean_context.lower()
+        original_context_lower = context_line.lower()  # Keep original for better recipient detection
+        
+        # Extract amounts and monetary values (general pattern)
+        amount_patterns = [
+            r'Rs\.\s*([0-9,]+(?:\.[0-9]+)?)',  # Indian Rupees
+            r'\$\s*([0-9,]+(?:\.[0-9]+)?)',  # US Dollars
+            r'([0-9,]+(?:\.[0-9]+)?)\s*(?:rupees|dollars)',  # Amount followed by currency word
+        ]
+        amount_matches = []
+        for pattern in amount_patterns:
+            amount_matches.extend(list(re.finditer(pattern, context_line, re.IGNORECASE)))
+        
+        # Sort by position in document
+        amount_matches.sort(key=lambda x: x.start())
+        
+        # Extract recipient/party information (general pattern - works for any legal case)
+        recipients = []
+        for match in amount_matches:
+            # Look for recipient info before/after amount (expanded window for better detection)
+            start = max(0, match.start() - 120)
+            end = min(len(context_line), match.end() + 120)
+            snippet = context_line[start:end].lower()
+            
+            # General party identification - look for common legal party references
+            recipient = None
+            
+            # Try to find party references (petitioner, respondent, appellant, etc.)
+            # Look for numbered parties (Respondent No. 1, Petitioner No. 2, etc.)
+            party_pattern = r'(?:petitioner|respondent|appellant|defendant|plaintiff|applicant)\s+no\.?\s*(\d+)'
+            party_match = re.search(party_pattern, snippet, re.IGNORECASE)
+            
+            # Look for role-based references
+            role_patterns = [
+                (r'\bwife\b', 'the wife'),
+                (r'\bhusband\b', 'the husband'),
+                (r'\b(?:son|daughter|child|minor)\b', 'the child'),
+                (r'\bpetitioner\b', 'the petitioner'),
+                (r'\brespondent\b', 'the respondent'),
+                (r'\bappellant\b', 'the appellant'),
+                (r'\bdefendant\b', 'the defendant'),
+                (r'\bplaintiff\b', 'the plaintiff'),
+            ]
+            
+            for pattern, label in role_patterns:
+                if re.search(pattern, snippet, re.IGNORECASE):
+                    recipient = label
+                    break
+            
+            # If found numbered party but no role, use generic reference
+            if party_match and not recipient:
+                party_num = party_match.group(1)
+                recipient = f'the party/respondent {party_num}'
+            
+            if recipient:
+                amount_text = match.group(0)
+                recipients.append((amount_text, recipient))
+        
+        # Extract sections and statutes (general pattern - works for any act/statute)
+        section_match = re.search(r'Section\s+(\d+(?:[A-Za-z])?)', clean_context, re.IGNORECASE)
+        section_info = ""
+        act_info = ""
+        
+        if section_match:
+            section_num = section_match.group(1)
+            # Try to identify the act/statute (general pattern)
+            act_patterns = [
+                (r'(\w+(?:\s+\w+)?(?:\s+Marriage)?\s+Act)', 'Act'),
+                (r'(Code\s+of\s+(?:Criminal|Civil)\s+Procedure)', 'Code'),
+                (r'(\w+\s+Code)', 'Code'),
+                (r'(\w+\s+Act)', 'Act'),
+            ]
+            
+            for pattern, suffix in act_patterns:
+                act_match = re.search(pattern, clean_context, re.IGNORECASE)
+                if act_match:
+                    act_name = act_match.group(1)
+                    section_info = f"Section {section_num} of the {act_name}"
+                    break
+            
+            if not section_info:
+                section_info = f"Section {section_num}"
+        
+        # Identify authority/court (general pattern - works for any court)
+        authority = None
+        court_patterns = [
+            (r'supreme court', 'the Supreme Court'),
+            (r'high court', 'the High Court'),
+            (r'district court', 'the District Court'),
+            (r'family court', 'the Family Court'),
+            (r'sessions court', 'the Sessions Court'),
+            (r'magistrate', 'the Magistrate'),
+            (r'tribunal', 'the Tribunal'),
+            (r'this court', 'the Court'),
+            (r'court', 'the Court'),
+        ]
+        
+        for pattern, label in court_patterns:
+            if re.search(pattern, context_lower):
+                authority = label
+                break
+        
+        # Build main sentence (no date prefix)
+        sentence_parts = []
+        
+        # Identify action and what happened (general legal actions)
+        # Check for various types of legal actions
+        action = None
+        action_object = None
+        
+        # Award/Grant actions
+        if 'awarded' in context_lower or 'award' in context_lower:
+            action = "awarded"
+            # Look for what was awarded (maintenance, compensation, damages, etc.)
+            if 'interim maintenance' in context_lower:
+                action_object = "interim maintenance"
+            elif 'maintenance' in context_lower:
+                action_object = "maintenance"
+            elif 'compensation' in context_lower:
+                action_object = "compensation"
+            elif 'damages' in context_lower:
+                action_object = "damages"
+            elif 'alimony' in context_lower:
+                action_object = "alimony"
+            elif 'relief' in context_lower:
+                action_object = "relief"
+            else:
+                action_object = None
+            
+            if authority and action_object:
+                if recipients:
+                    if len(recipients) == 1:
+                        # Determine frequency (per month, per year, one-time)
+                        frequency = " per month" if "per month" in original_context_lower or "p.m." in original_context_lower else ""
+                        frequency = frequency or (" per year" if "per year" in original_context_lower else "")
+                        sentence_parts.append(f"{authority} {action} {action_object} of {recipients[0][0]}{frequency} to {recipients[0][1]}")
+                    else:
+                        # Multiple recipients - map amounts correctly
+                        recipient_amount_pairs = []
+                        for match in amount_matches[:3]:  # Limit to 3 amounts
+                            start = max(0, match.start() - 120)
+                            end = min(len(context_line), match.end() + 120)
+                            snippet = context_line[start:end].lower()
+                            
+                            recipient = None
+                            # Use general party detection
+                            for pattern, label in [
+                                (r'\bwife\b', 'the wife'),
+                                (r'\bhusband\b', 'the husband'),
+                                (r'\b(?:son|daughter|child|minor)\b', 'the child'),
+                                (r'petitioner.*?(?:no\.?\s*)?(\d+)', lambda m: f'the petitioner {m.group(1)}'),
+                                (r'respondent.*?(?:no\.?\s*)?(\d+)', lambda m: f'the respondent {m.group(1)}'),
+                                (r'appellant', 'the appellant'),
+                                (r'defendant', 'the defendant'),
+                                (r'plaintiff', 'the plaintiff'),
+                            ]:
+                                match_result = re.search(pattern, snippet, re.IGNORECASE)
+                                if match_result:
+                                    if callable(label):
+                                        recipient = label(match_result)
+                                    else:
+                                        recipient = label
+                                    break
+                            
+                            if recipient:
+                                recipient_amount_pairs.append((match.group(0), recipient))
+                        
+                        if recipient_amount_pairs:
+                            frequency = " per month" if "per month" in original_context_lower else ""
+                            parts_list = [f"{amt}{frequency} to {recip}" for amt, recip in recipient_amount_pairs[:2]]
+                            sentence_parts.append(f"{authority} {action} {action_object}: {', '.join(parts_list)}")
+                        else:
+                            frequency = " per month" if "per month" in original_context_lower else ""
+                            parts_list = [f"{amt}{frequency} to {recip}" for amt, recip in recipients[:2]]
+                            sentence_parts.append(f"{authority} {action} {action_object}: {', '.join(parts_list)}")
+                else:
+                    # Extract amounts without recipient info
+                    amounts = [match.group(0) for match in amount_matches[:2]]
+                    frequency = " per month" if "per month" in original_context_lower else ""
+                    if amounts:
+                        if len(amounts) == 1:
+                            sentence_parts.append(f"{authority} {action} {action_object} of {amounts[0]}{frequency}")
+                        else:
+                            sentence_parts.append(f"{authority} {action} {action_object} of {amounts[0]} and {amounts[1]}{frequency}")
+                    else:
+                        sentence_parts.append(f"{authority} {action} {action_object}")
+            elif authority:
+                sentence_parts.append(f"{authority} {action}")
+            else:
+                sentence_parts.append(action.capitalize())
+        
+        # Directed/Order actions (general)
+        elif 'directed' in context_lower or 'direction' in context_lower:
+            action = "directed"
+            if authority:
+                if 'pay' in context_lower or 'payment' in context_lower or amount_matches:
+                    if recipients and amount_matches:
+                        sentence_parts.append(f"{authority} directed payment of {amount_matches[0].group(0)} to {recipients[0][1]}")
+                    elif amount_matches:
+                        sentence_parts.append(f"{authority} directed payment of {amount_matches[0].group(0)}")
+                    else:
+                        sentence_parts.append(f"{authority} directed payment")
+                elif 'file' in context_lower or 'filing' in context_lower:
+                    # Extract what needs to be filed
+                    filing_object = None
+                    if 'affidavit' in context_lower:
+                        filing_object = "affidavit"
+                    elif 'return' in context_lower or 'tax' in context_lower:
+                        filing_object = "tax returns"
+                    elif 'application' in context_lower:
+                        filing_object = "application"
+                    else:
+                        filing_object = "documents"
                     
-        return event_type
+                    sentence_parts.append(f"{authority} directed filing of {filing_object}")
+                else:
+                    sentence_parts.append(f"{authority} issued directions")
+            else:
+                sentence_parts.append("Directions were issued")
         
+        elif 'ordered' in context_lower or 'order' in context_lower:
+            if authority:
+                if 'arrears' in context_lower:
+                    if amount_matches:
+                        sentence_parts.append(f"{authority} ordered payment of arrears amounting to {amount_matches[0].group(0)}")
+                    else:
+                        sentence_parts.append(f"{authority} ordered payment of arrears")
+                elif 'maintenance' in context_lower:
+                    if recipients and amount_matches:
+                        sentence_parts.append(f"{authority} ordered maintenance of {amount_matches[0].group(0)} per month to {recipients[0][1]}")
+                    elif amount_matches:
+                        sentence_parts.append(f"{authority} ordered maintenance of {amount_matches[0].group(0)} per month")
+                    else:
+                        sentence_parts.append(f"{authority} ordered maintenance")
+                elif 'compliance' in context_lower or 'affidavit' in context_lower:
+                    sentence_parts.append(f"{authority} ordered filing of compliance affidavit")
+                else:
+                    sentence_parts.append(f"{authority} issued an order")
+            else:
+                sentence_parts.append("An order was issued")
+        
+        elif 'amended' in context_lower or 'amendment' in context_lower:
+            if section_info:
+                sentence_parts.append(f"{section_info} was amended")
+            else:
+                sentence_parts.append("A statutory amendment was made")
+        
+        elif 'filed' in context_lower or 'filing' in context_lower:
+            if 'affidavit' in context_lower:
+                sentence_parts.append("An affidavit was filed")
+            elif 'application' in context_lower:
+                sentence_parts.append("An application was filed")
+            else:
+                sentence_parts.append("A filing was made")
+        
+        elif 'decided' in context_lower or 'decision' in context_lower:
+            if authority:
+                sentence_parts.append(f"{authority} delivered a judgment")
+            else:
+                sentence_parts.append("A judgment was delivered")
+        
+        elif 'dismissed' in context_lower:
+            if authority:
+                sentence_parts.append(f"{authority} dismissed the case")
+            else:
+                sentence_parts.append("The case was dismissed")
+        
+        else:
+            # Fallback: try to extract meaningful action
+            if authority:
+                sentence_parts.append(f"{authority} took action")
+            else:
+                sentence_parts.append("Legal action was taken")
+        
+        # Build complete sentence - ensure it starts with capital letter
+        main_sentence = ' '.join(sentence_parts) if sentence_parts else "A legal event occurred."
+        if not main_sentence.endswith('.'):
+            main_sentence += '.'
+        
+        # Capitalize first letter
+        if main_sentence and len(main_sentence) > 0:
+            main_sentence = main_sentence[0].upper() + main_sentence[1:]
+        
+        # Build detailed additional information (2-3 more lines)
+        additional_info = []
+        
+        # Extract more context for vague actions - be very specific
+        if not sentence_parts or main_sentence.lower().startswith('legal action') or main_sentence.lower().startswith('an order was issued') or main_sentence.lower().startswith('a judgment was delivered') or main_sentence.lower().startswith('the court took action'):
+            # Try to extract very specific information from context
+            
+            # Check for amendment/provision insertion
+            if 'amendment' in context_lower or 'amended' in context_lower or 'inserted' in context_lower:
+                if section_info:
+                    if '60 days' in context_lower or 'disposal' in context_lower:
+                        # Extract what type of applications (general)
+                        app_type = "applications"
+                        if 'maintenance' in context_lower:
+                            app_type = "maintenance applications"
+                        elif 'petition' in context_lower:
+                            app_type = "petitions"
+                        main_sentence = f"{section_info} was amended to insert provisions requiring disposal of {app_type} within 60 days."
+                    elif 'proviso' in context_lower:
+                        # Extract what proceedings (general)
+                        proc_type = "proceedings"
+                        if 'maintenance' in context_lower:
+                            proc_type = "maintenance proceedings"
+                        elif 'criminal' in context_lower:
+                            proc_type = "criminal proceedings"
+                        elif 'civil' in context_lower:
+                            proc_type = "civil proceedings"
+                        main_sentence = f"{section_info} was amended by inserting a proviso regarding {proc_type}."
+                    else:
+                        main_sentence = f"{section_info} was amended by inserting new provisions."
+                else:
+                    main_sentence = f"A statutory amendment was made."
+            
+            # Check for writ petition (general)
+            elif 'writ petition' in context_lower or ('petition' in context_lower and 'writ' in context_lower):
+                if 'dismissed' in context_lower or 'rejected' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} dismissed the writ petition."
+                elif 'filed' in context_lower or 'instituted' in context_lower:
+                    main_sentence = f"A writ petition was filed before {authority if authority else 'the Court'}."
+                elif 'allowed' in context_lower or 'granted' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} allowed the writ petition."
+                else:
+                    main_sentence = f"{authority if authority else 'The Court'} dealt with a writ petition."
+            
+            # Check for appeal decisions
+            elif 'appeal' in context_lower:
+                appeal_type = None
+                appeal_num = None
+                
+                # Try to extract appeal number
+                appeal_match = re.search(r'(?:Criminal|Civil)\s+Appeal\s+(?:No\.?\s*)?(\d+(?:\/\d+)?)', context_line, re.IGNORECASE)
+                if appeal_match:
+                    appeal_num = appeal_match.group(1)
+                    if 'criminal' in appeal_match.group(0).lower():
+                        appeal_type = 'Criminal'
+                    else:
+                        appeal_type = 'Civil'
+                elif 'criminal appeal' in context_lower:
+                    appeal_type = 'Criminal'
+                elif 'civil appeal' in context_lower:
+                    appeal_type = 'Civil'
+                
+                # Determine what happened with the appeal
+                if 'affirmed' in context_lower:
+                    if appeal_num and appeal_type:
+                        # Extract which court order was affirmed (general)
+                        affirmed_court = "the lower court order"
+                        if 'family court' in context_lower:
+                            affirmed_court = "the Family Court order"
+                        elif 'high court' in context_lower:
+                            affirmed_court = "the High Court order"
+                        main_sentence = f"The Supreme Court affirmed {affirmed_court} while deciding {appeal_type} Appeal No. {appeal_num}."
+                    elif appeal_type:
+                        main_sentence = f"{authority if authority else 'The Court'} affirmed the lower court's order while deciding a {appeal_type.lower()} appeal."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} affirmed the judgment of the lower court in an appeal."
+                elif 'dismissed' in context_lower:
+                    if appeal_type:
+                        main_sentence = f"{authority if authority else 'The Court'} dismissed the {appeal_type.lower()} appeal and upheld the lower court's order."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} dismissed the appeal and maintained the original order."
+                elif 'decided' in context_lower:
+                    if amount_matches:
+                        main_sentence = f"{authority if authority else 'The Court'} decided an appeal regarding financial matters and payment of amounts."
+                    elif appeal_type:
+                        main_sentence = f"{authority if authority else 'The Court'} decided a {appeal_type.lower()} appeal challenging the lower court's order."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} decided an appeal in the matter."
+                else:
+                    if appeal_num and appeal_type:
+                        main_sentence = f"{authority if authority else 'The Court'} decided {appeal_type} Appeal No. {appeal_num} in the matter."
+                    elif appeal_type:
+                        main_sentence = f"{authority if authority else 'The Court'} decided a {appeal_type.lower()} appeal in the case."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} decided an appeal in the matter."
+            
+            # Check for judgment decisions (general)
+            elif 'judgment' in context_lower or ('decided' in context_lower and 'appeal' not in context_lower):
+                if 'affirmed' in context_lower or 'upheld' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} affirmed the judgment of the lower court."
+                elif 'reversed' in context_lower or 'set aside' in context_lower or 'quashed' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} reversed the judgment of the lower court."
+                elif 'modified' in context_lower or 'varied' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} modified the judgment of the lower court."
+                elif amount_matches:
+                    main_sentence = f"{authority if authority else 'The Court'} delivered a judgment confirming amounts and payment directions."
+                elif 'guidelines' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} delivered a judgment framing guidelines for the case."
+                else:
+                    main_sentence = f"{authority if authority else 'The Court'} delivered a judgment in the matter."
+            
+            # Check for specific orders (general)
+            elif 'order' in context_lower or 'ordered' in context_lower:
+                if 'compliance' in context_lower or 'affidavit' in context_lower:
+                    if 'disclosure' in context_lower or 'assets' in context_lower:
+                        main_sentence = f"{authority if authority else 'The Court'} ordered filing of an affidavit disclosing assets and liabilities."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} ordered filing of a compliance affidavit."
+                elif amount_matches:
+                    if 'arrears' in context_lower or 'outstanding' in context_lower:
+                        main_sentence = f"{authority if authority else 'The Court'} ordered payment of arrears amounting to {amount_matches[0].group(0)}."
+                    else:
+                        main_sentence = f"{authority if authority else 'The Court'} issued an order regarding payment of {amount_matches[0].group(0)}."
+                elif 'guidelines' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} issued an order seeking suggestions for framing guidelines."
+                elif 'tax' in context_lower or 'returns' in context_lower or 'income tax' in context_lower:
+                    # Extract who needs to file (not hardcoded to husband)
+                    party = "the party"  # Generic
+                    if 'appellant' in context_lower or 'husband' in context_lower:
+                        party = "the appellant"
+                    elif 'petitioner' in context_lower:
+                        party = "the petitioner"
+                    elif 'respondent' in context_lower:
+                        party = "the respondent"
+                    main_sentence = f"{authority if authority else 'The Court'} issued an order directing {party} to file Income Tax Returns and Assessment Orders."
+                elif 'stay' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} issued a stay order."
+                elif 'injunction' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} issued an injunction order."
+                else:
+                    main_sentence = f"{authority if authority else 'The Court'} issued an order in the matter."
+            
+            # If still vague, try to extract action from event type (general)
+            elif event_type:
+                event_type_lower = event_type.lower()
+                if amount_matches:
+                    main_sentence = f"{authority if authority else 'The Court'} took action in the {event_type_lower} matter regarding payment of {amount_matches[0].group(0)}."
+                elif 'amendment' in event_type_lower:
+                    main_sentence = f"A statutory amendment was made."
+                else:
+                    main_sentence = f"{authority if authority else 'The Court'} took action in the {event_type_lower} matter."
+            
+            # Last resort - but try to be specific (general patterns)
+            else:
+                # Check original context for any action words
+                if 'inserted' in context_lower or 'insertion' in context_lower:
+                    if section_info:
+                        main_sentence = f"{section_info} was amended by inserting new provisions."
+                    else:
+                        main_sentence = f"A statutory provision was inserted."
+                elif 'guidelines' in context_lower:
+                    main_sentence = f"{authority if authority else 'The Court'} took action to frame guidelines."
+                elif 'mediation' in context_lower:
+                    main_sentence = f"The matter was referred for mediation."
+                else:
+                    main_sentence = f"{authority if authority else 'The Court'} took action in the case."
+        
+        # Add period information if available
+        period_match = re.search(r'(?:from|since|w\.e\.f\.|with effect from)\s+(\d{1,2}\.\d{1,2}\.\d{4})', context_line, re.IGNORECASE)
+        if period_match:
+            period_date = period_match.group(1)
+            additional_info.append(f"The order was effective from {period_date}.")
+        
+        # Add more details about what was ordered/directed (general)
+        if 'directed' in context_lower or 'ordered' in context_lower:
+            if 'income tax' in context_lower or 'tax returns' in context_lower:
+                # Extract party (not hardcoded to husband)
+                party = "the party"
+                if 'appellant' in context_lower:
+                    party = "the appellant"
+                elif 'petitioner' in context_lower:
+                    party = "the petitioner"
+                elif 'respondent' in context_lower:
+                    party = "the respondent"
+                additional_info.append(f"{party.capitalize()} was directed to file Income Tax Returns and Assessment Orders.")
+            
+            if 'passport' in context_lower:
+                party = "the party"
+                if 'appellant' in context_lower:
+                    party = "the appellant"
+                elif 'petitioner' in context_lower:
+                    party = "the petitioner"
+                additional_info.append(f"{party.capitalize()} was directed to provide a photocopy of the passport.")
+            
+            if 'pay' in context_lower or 'payment' in context_lower:
+                if amount_matches and len(amount_matches) > 1:
+                    total_amounts = ', '.join([m.group(0) for m in amount_matches[:2]])
+                    additional_info.append(f"The order involved multiple payments: {total_amounts}.")
+        
+        # Add details about arrears
+        if 'arrears' in context_lower:
+            if amount_matches:
+                arrears_amount = amount_matches[-1].group(0) if amount_matches else None
+                if arrears_amount and arrears_amount not in main_sentence:
+                    additional_info.append(f"The order addressed payment of arrears amounting to {arrears_amount}.")
+            elif 'part' in context_lower and 'paid' in context_lower:
+                additional_info.append("It was noted that only part of the arrears had been paid, and a final opportunity was granted.")
+            elif 'balance' in context_lower:
+                additional_info.append("A final opportunity was granted to pay the balance amount, failing which contempt proceedings would be initiated.")
+        
+        # Add section/statute information with context (general)
+        if section_info:
+            if 'amendment' in context_lower:
+                # Extract what the amendment was about (not hardcoded to maintenance)
+                amendment_content = None
+                if '60 days' in context_lower or 'disposal' in context_lower:
+                    amendment_content = "disposal of applications within 60 days"
+                elif 'time' in context_lower and ('limit' in context_lower or 'period' in context_lower):
+                    amendment_content = "time limits for proceedings"
+                elif 'procedure' in context_lower:
+                    amendment_content = "procedural requirements"
+                
+                if amendment_content:
+                    additional_info.append(f"The amendment inserted provisions requiring {amendment_content}.")
+                else:
+                    additional_info.append(f"The amendment inserted new provisions in {section_info}.")
+            elif section_info not in main_sentence.lower():
+                additional_info.append(f"This order was passed under {section_info}.")
+        
+        # Add details about appeals/challenges (general)
+        if 'challenged' in context_lower or 'impugn' in context_lower:
+            # Extract who challenged
+            challenger = "The appellant"
+            if 'petitioner' in context_lower:
+                challenger = "The petitioner"
+            elif 'respondent' in context_lower:
+                challenger = "The respondent"
+            
+            # Extract which court order was challenged
+            challenged_court = "the lower court order"
+            if 'family court' in context_lower:
+                challenged_court = "the Family Court order"
+            elif 'high court' in context_lower:
+                challenged_court = "the High Court order"
+            
+            # Extract where it was challenged
+            if 'high court' in context_lower:
+                court_name = "the High Court"
+                if 'bombay' in context_lower:
+                    court_name = "the Bombay High Court"
+                elif 'delhi' in context_lower:
+                    court_name = "the Delhi High Court"
+                additional_info.append(f"{challenger} challenged {challenged_court} before {court_name}.")
+            elif 'supreme court' in context_lower:
+                additional_info.append(f"{challenger} challenged {challenged_court} before the Supreme Court.")
+            else:
+                additional_info.append(f"{challenger} challenged {challenged_court}.")
+        
+        # Add mediation details
+        if 'mediation' in context_lower:
+            if 'failed' in context_lower:
+                additional_info.append("Mediation attempts failed, and the matter proceeded for final hearing.")
+            else:
+                additional_info.append("The matter was referred for mediation to resolve disputes.")
+        
+        # Add compliance/affidavit details
+        if 'compliance' in context_lower or 'affidavit' in context_lower:
+            if 'disclosure' in context_lower or 'assets' in context_lower:
+                additional_info.append("The order required filing of an affidavit disclosing assets and liabilities.")
+            elif 'filed' in context_lower:
+                additional_info.append("An affidavit of compliance was filed stating the status of payments.")
+        
+        # Add details about recipients if multiple (general)
+        if recipients and len(recipients) > 1:
+            recipient_names = [r[1] for r in recipients[:2]]
+            if len(set(recipient_names)) > 1:  # Different recipients
+                # Extract what was awarded (not hardcoded to maintenance)
+                award_type = "Amounts"
+                if action_object:
+                    award_type = action_object.capitalize()
+                elif 'maintenance' in context_lower:
+                    award_type = "Maintenance"
+                elif 'compensation' in context_lower:
+                    award_type = "Compensation"
+                additional_info.append(f"{award_type} was awarded separately to {', '.join(recipient_names)}.")
+        
+        # Build final summary (1-4 lines)
+        lines = [main_sentence]
+        if additional_info:
+            lines.extend(additional_info[:3])  # Add up to 3 more lines
+        
+        return '\n'.join(lines)
+    
     def _create_event(self, date_obj: datetime, context_line: str, line_num: int, idx: int = 1) -> Dict[str, Any]:
-        """Create a single event entry"""
+        """Create a single event entry with automatic summary generation"""
         event_type = self._classify_event(context_line)
         event_id = f"{date_obj.isoformat()}_{idx}"
         event_name = f"{event_type}"
         
         if idx > 1:
             event_name += f" ({idx})"
+        
+        # Generate summary automatically
+        summary = self._create_summary_from_context(date_obj, context_line, event_type)
             
         return {
             'id': event_id,
@@ -502,6 +1213,7 @@ class TimelineAnalyzer:
             'date': date_obj.isoformat(),
             'eventType': event_type,
             'context': context_line,
+            'summary': summary,  # Always include summary
             'lineNumber': line_num
         }
         

@@ -12,7 +12,7 @@ import json
 from contextlib import redirect_stdout
 import argparse
 from pathlib import Path
-import hashlib
+import hashlib # type: ignore
 import os
 
 # Ensure local imports work when invoked from other cwd
