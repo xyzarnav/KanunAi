@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import { summarizeCase, initQA, chatQA, analyzeTimeline, refactorTimeline } from "../controllers/analysis.controller.js";
+import { summarizeCase, initQA, chatQA, analyzeTimeline, refactorTimeline, searchPrecedents } from "../controllers/analysis.controller.js";
 
 const router = Router();
 
@@ -36,6 +36,9 @@ router.post("/timeline", upload.single("file"), analyzeTimeline);
 
 // Refactor timeline context endpoint
 router.post("/refactor-timeline", refactorTimeline);
+
+// Precedent search endpoint
+router.post("/precedent-search", searchPrecedents);
 
 export default router;
 

@@ -39,6 +39,16 @@ export default function CaseAnalysis() {
   const [showTimeline, setShowTimeline] = useState(false);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineVisible, setTimelineVisible] = useState(true);
+  const [precedentSearchLoading, setPrecedentSearchLoading] = useState(false);
+  const [precedents, setPrecedents] = useState<Array<{
+    caseName: string;
+    court: string;
+    year: number;
+    similarityReason: string;
+    keyPrinciple: string;
+  }>>([]);
+  const [showPrecedents, setShowPrecedents] = useState(false);
+  const [precedentsVisible, setPrecedentsVisible] = useState(true);
 
   useEffect(() => {
     // Listen for floating dock chatbot icon event
@@ -219,6 +229,45 @@ export default function CaseAnalysis() {
     }
   };
 
+  const searchPrecedents = async () => {
+    if (!summaryMd) {
+      alert('Please generate a case summary first');
+      return;
+    }
+
+    // If precedents already exist, just show them without re-searching
+    if (precedents.length > 0) {
+      setShowPrecedents(true);
+      setPrecedentsVisible(true);
+      return;
+    }
+
+    setPrecedentSearchLoading(true);
+    try {
+      const resp = await fetch('/api/analysis/precedent-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ summary: summaryMd }),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data?.message || data?.error || 'Failed to search precedents');
+      }
+
+      const data = await resp.json();
+      setPrecedents(data.precedents || []);
+      setShowPrecedents(true);
+      setPrecedentsVisible(true);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to search precedents');
+    } finally {
+      setPrecedentSearchLoading(false);
+    }
+  };
+
   const downloadSummary = () => {
     if (!summaryMd) return;
     const blob = new Blob([summaryMd], { type: 'text/markdown;charset=utf-8' });
@@ -315,9 +364,9 @@ export default function CaseAnalysis() {
           </div>
         )}
 
-        {/* Timeline Analysis Button (visible when summary is available) - Left Aligned */}
+        {/* Timeline Analysis and Precedent Search Buttons (visible when summary is available) - Left Aligned */}
         {summaryMd && !showTimeline && uploadedFile && (
-          <div className="mb-8 flex gap-4 justify-start">
+          <div className="mb-8 flex gap-4 justify-start flex-wrap">
             <div className="bg-gradient-to-r from-purple-600/20 to-purple-500/10 rounded-xl border border-purple-500/30 p-4 shadow-lg hover:shadow-purple-500/20 transition-all">
               <button
                 onClick={analyzeTimeline}
@@ -343,6 +392,88 @@ export default function CaseAnalysis() {
               </button>
               <p className="text-xs text-gray-400 mt-2 ml-1">Create a visual timeline of key events from your case</p>
             </div>
+
+            <div className="bg-gradient-to-r from-blue-600/20 to-blue-500/10 rounded-xl border border-blue-500/30 p-4 shadow-lg hover:shadow-blue-500/20 transition-all">
+              <button
+                onClick={searchPrecedents}
+                disabled={precedentSearchLoading}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 shadow-md hover:shadow-lg"
+              >
+                {precedentSearchLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Searching Precedents...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span>Precedent Search</span>
+                  </>
+                )}
+              </button>
+              <p className="text-xs text-gray-400 mt-2 ml-1">Find top similar cases</p>
+            </div>
+          </div>
+        )}
+
+        {/* Precedent Search Results Table */}
+        {showPrecedents && precedents.length > 0 && (
+          <div className="mb-8 bg-gray-900/50 rounded-2xl border border-gray-800 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-2xl font-bold">Similar Cases Found</h3>
+                <p className="text-gray-400 mt-1">Top {precedents.length} cases similar to your case</p>
+              </div>
+              <button
+                onClick={() => setPrecedentsVisible(!precedentsVisible)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                {precedentsVisible ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.011 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.011-9.963-7.178z" />
+                  </svg>
+                )}
+                <span>{precedentsVisible ? 'Hide Precedents' : 'Show Precedents'}</span>
+              </button>
+            </div>
+            
+            {precedentsVisible && (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse bg-white rounded-lg overflow-hidden">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+                      <th className="px-4 py-3 text-left font-semibold text-sm">Case Name</th>
+                      <th className="px-4 py-3 text-left font-semibold text-sm">Court</th>
+                      <th className="px-4 py-3 text-left font-semibold text-sm">Year</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {precedents.map((precedent, index) => (
+                      <tr
+                        key={index}
+                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        }`}
+                      >
+                        <td className="px-4 py-3 text-gray-900 font-medium">{precedent.caseName}</td>
+                        <td className="px-4 py-3 text-gray-700">{precedent.court}</td>
+                        <td className="px-4 py-3 text-gray-700">{precedent.year}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

@@ -453,3 +453,99 @@ export async function refactorTimeline(req: Request, res: Response) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
+
+export async function searchPrecedents(req: Request, res: Response) {
+  try {
+    const { summary } = req.body;
+    
+    if (!summary || typeof summary !== 'string' || summary.trim().length === 0) {
+      return res.status(400).json({ message: "Case summary is required" });
+    }
+
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const cliPath = path.join(aiServiceDir, "precedent_search_cli.py");
+
+    if (!fs.existsSync(cliPath)) {
+      return res.status(500).json({ 
+        message: "Precedent search service not available",
+        precedents: []
+      });
+    }
+
+    // Load ai-service .env
+    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
+
+    const pythonBin = getPythonExecutable();
+    const logPrefix = "[precedent-search]";
+
+    return new Promise<void>((resolve) => {
+      const pythonProcess = spawn(pythonBin, [cliPath], {
+        cwd: aiServiceDir,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env }
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+        console.error(`${logPrefix} stderr:`, data.toString());
+      });
+
+      pythonProcess.on('close', (exitCode) => {
+        if (exitCode !== 0) {
+          console.error(`${logPrefix} Python failed with code`, exitCode);
+          return resolve(res.status(500).json({
+            message: "Precedent search failed",
+            error: stderr,
+            precedents: []
+          }));
+        }
+
+        if (!stdout) {
+          console.error(`${logPrefix} No output from Python`);
+          return resolve(res.status(500).json({
+            message: "No output from precedent search",
+            precedents: []
+          }));
+        }
+
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          const precedents = parsed.precedents || [];
+          
+          console.log(`${logPrefix} Found ${precedents.length} precedents`);
+          
+          return resolve(res.json({
+            precedents: precedents.slice(0, 5), // Ensure max 5
+            count: precedents.length
+          }));
+        } catch (e) {
+          console.error(`${logPrefix} Parse error:`, e);
+          return resolve(res.status(500).json({
+            message: "Failed to parse precedent search results",
+            error: String(e),
+            precedents: []
+          }));
+        }
+      });
+
+      // Write JSON input to Python CLI
+      pythonProcess.stdin.write(JSON.stringify({ summary }));
+      pythonProcess.stdin.end();
+    });
+  } catch (error) {
+    console.error("[precedent-search] Error:", error);
+    return res.status(500).json({ 
+      message: "Server error", 
+      error: String(error),
+      precedents: []
+    });
+  }
+}

@@ -18,6 +18,9 @@ export default function CaseSummaryViewer({
   printSummary,
   copySummary,
 }: CaseSummaryViewerProps) {
+  // Remove standalone ** markers (at start of lines) but keep **text** pairs for bold formatting
+  const cleanedSummary = summaryMd ? summaryMd.replace(/^\*\*\s+/gm, '') : '';
+
   return (
     <div className="min-h-[700px]">
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
@@ -54,9 +57,9 @@ export default function CaseSummaryViewer({
 
         {/* Content area with aesthetic scrollbar and spacing */}
         <div className={`p-8 max-h-[80vh] overflow-y-auto ${styles.scrollArea}`}>
-          {summaryMd ? (
+          {cleanedSummary ? (
             <article className="prose max-w-none text-gray-900 leading-relaxed space-y-4">
-              <ReactMarkdown>{summaryMd}</ReactMarkdown>
+              <ReactMarkdown>{cleanedSummary}</ReactMarkdown>
             </article>
           ) : (
             <div className="text-gray-600">The generated summary will appear here.</div>

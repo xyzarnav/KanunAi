@@ -143,12 +143,12 @@ export default function CaseInputPanel({
 
       <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
         <div className="block mb-3">
-          <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Legal Question / Issue Description *</span>
+          <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Legal Question / Issue Description in Chat</span>
         </div>
         {/* Quick question checkboxes */}
-        <div className="mb-4">
-          <div className="text-sm text-gray-400 mb-2">Quick prompts — tap to include in the analysis:</div>
-          <div className="flex flex-wrap gap-2">
+        <div className="mb-56">
+          {/* <div className="text-sm text-gray-400 mb-2">Quick prompts — tap to include in the analysis:</div> */}
+          {/* <div className="flex flex-wrap gap-2">
             {[
               'What is the case about? (short)',
               'Give a short/simple summary',
@@ -174,17 +174,17 @@ export default function CaseInputPanel({
                 </button>
               );
             })}
-          </div>
+          </div> */}
         </div>
-        <textarea
+        {/* <textarea
           value={legalIssue}
           onChange={(e) => setLegalIssue(e.target.value)}
           placeholder="Describe the legal issue, question, or the specific aspect you want to analyze..."
           rows={8}
           className="w-full bg-gray-950 border border-gray-700 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all resize-none"
           required={!uploadedFile}
-        />
-        <p className="text-gray-500 text-sm mt-3">Be specific about the legal principles, statutes, or precedents you want analyzed</p>
+        /> */}
+        {/* <p className="text-gray-500 text-sm mt-3">Be specific about the legal principles, statutes, or precedents you want analyzed</p> */}
       </div>
 
       <div className="flex items-center justify-between pt-2">
