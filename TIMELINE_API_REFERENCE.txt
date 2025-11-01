@@ -1,0 +1,483 @@
+# Timeline Analysis API - Usage Examples
+
+## Endpoint
+
+```
+POST /api/analysis/timeline
+```
+
+## Request Format
+
+### cURL Example
+```bash
+curl -X POST http://localhost:3000/api/analysis/timeline \
+  -F "file=@/path/to/document.pdf"
+```
+
+### JavaScript/Fetch Example
+```javascript
+const formData = new FormData();
+formData.append('file', pdfFile); // File object from input
+
+const response = await fetch('/api/analysis/timeline', {
+  method: 'POST',
+  body: formData,
+});
+
+const result = await response.json();
+console.log(result.events);
+```
+
+### React Example (as implemented)
+```typescript
+const analyzeTimeline = async () => {
+  if (!uploadedFile) {
+    alert('Please upload a file first');
+    return;
+  }
+
+  setTimelineLoading(true);
+  try {
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
+
+    const resp = await fetch('/api/analysis/timeline', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!resp.ok) {
+      const data = await resp.json();
+      throw new Error(data?.message || 'Timeline analysis failed');
+    }
+
+    const data = await resp.json();
+    setTimelineEvents(data.events || []);
+    setShowTimeline(true);
+  } catch (err) {
+    alert(err?.message || 'Failed to generate timeline');
+  } finally {
+    setTimelineLoading(false);
+  }
+};
+```
+
+## Response Format
+
+### Success Response (200 OK)
+```json
+{
+  "events": [
+    {
+      "id": "2024-01-15_1",
+      "eventName": "Filing",
+      "date": "2024-01-15",
+      "eventType": "filing",
+      "context": "Petition filed on 15 January 2024 at the court",
+      "lineNumber": 42
+    },
+    {
+      "id": "2024-03-20_1",
+      "eventName": "Hearing",
+      "date": "2024-03-20",
+      "eventType": "hearing",
+      "context": "Hearing scheduled for 20 March 2024",
+      "lineNumber": 156
+    },
+    {
+      "id": "2024-12-10_1",
+      "eventName": "Judgment",
+      "date": "2024-12-10",
+      "eventType": "judgment",
+      "context": "Judgment delivered on 10 December 2024",
+      "lineNumber": 523
+    }
+  ],
+  "summary": {
+    "total_events": 3,
+    "event_types": {
+      "filing": 1,
+      "hearing": 1,
+      "judgment": 1
+    },
+    "date_range": {
+      "start": "2024-01-15",
+      "end": "2024-12-10"
+    },
+    "first_event": {
+      "id": "2024-01-15_1",
+      "eventName": "Filing",
+      "date": "2024-01-15",
+      "eventType": "filing"
+    },
+    "last_event": {
+      "id": "2024-12-10_1",
+      "eventName": "Judgment",
+      "date": "2024-12-10",
+      "eventType": "judgment"
+    }
+  }
+}
+```
+
+### Error Response (No Dates Found - 400)
+```json
+{
+  "message": "No dates found in document",
+  "error": "The document does not contain any extractable dates in recognized formats",
+  "events": []
+}
+```
+
+### Error Response (PDF Parse Error - 500)
+```json
+{
+  "message": "Timeline analysis failed",
+  "code": 1,
+  "stderr": "Error details from Python",
+  "stdout": ""
+}
+```
+
+### Error Response (No File - 400)
+```json
+{
+  "message": "Upload a PDF file to analyze timeline"
+}
+```
+
+## Event Type Values
+
+Valid `eventType` values returned:
+- `"filing"` - Blue
+- `"hearing"` - Orange
+- `"judgment"` - Green
+- `"appeal"` - Purple
+- `"settlement"` - Cyan
+- `"dismissal"` - Red
+- `"interim"` - Amber
+- `"adjournment"` - Slate
+- `"other"` - Gray
+
+## Date Format
+
+All dates returned as ISO 8601 strings:
+```
+YYYY-MM-DD
+```
+
+Example: `"2024-01-15"`
+
+## Event ID Format
+
+Event IDs are deterministic and follow pattern:
+```
+YYYY-MM-DD_N
+```
+
+Where:
+- `YYYY-MM-DD` = event date in ISO format
+- `N` = incremental number for events on same date (1-indexed)
+
+Examples:
+- First event on 2024-01-15: `"2024-01-15_1"`
+- Second event on 2024-01-15: `"2024-01-15_2"`
+- Third event on 2024-01-15: `"2024-01-15_3"`
+
+## Event Name Format
+
+Event names are human-readable:
+```
+[EventType][ (N)]?
+```
+
+Examples:
+- First event of type: `"Filing"`
+- Second event of same type on same day: `"Filing (2)"`
+- Third appeal event on same day: `"Appeal (3)"`
+
+## Context Field
+
+The `context` field contains the original text line from the document where the date was found. This provides:
+- Human-readable context
+- Source verification
+- Debugging information
+
+Example:
+```
+"context": "The hearing shall be held on March 20, 2024 at 10:00 AM"
+```
+
+## Line Number Field
+
+The `lineNumber` field indicates where in the document the date was found:
+- Useful for document verification
+- Helps with OCR quality assessment
+- Enables highlighting in source document
+
+Example:
+```
+"lineNumber": 156
+```
+
+Means the date was found on line 156 of the document.
+
+## Performance Expectations
+
+| Document Size | Expected Time |
+|---|---|
+| < 10 pages | < 1 second |
+| 10-50 pages | 1-2 seconds |
+| 50-100 pages | 2-3 seconds |
+| 100+ pages | 3-5 seconds |
+
+## Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success - timeline generated |
+| 400 | Bad request - no file or no dates found |
+| 500 | Server error - PDF parsing failed |
+
+## Rate Limiting
+
+No rate limits applied to timeline endpoint.
+
+## Timeout
+
+Default timeout: 120 seconds
+
+Configurable via environment variable:
+```bash
+SUMMARY_TIMEOUT_MS=120000
+```
+
+## File Size Limits
+
+- Maximum file size: 50 MB (configurable)
+- Supported format: PDF only
+- PDF must have extractable text (not pure image scans)
+
+## Multi-Event Same Day Handling
+
+When multiple events occur on the same date:
+
+**Request:**
+```
+PDF containing: 
+- "Filing on 15 January 2024"
+- "Status hearing on 15 January 2024"
+- "Judge's direction on 15 January 2024"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "2024-01-15_1",
+    "eventName": "Filing",
+    "date": "2024-01-15"
+  },
+  {
+    "id": "2024-01-15_2",
+    "eventName": "Hearing (2)",
+    "date": "2024-01-15"
+  },
+  {
+    "id": "2024-01-15_3",
+    "eventName": "Other (3)",
+    "date": "2024-01-15"
+  }
+]
+```
+
+Note: Events are ordered by line number within same date.
+
+## Determinism Guarantee
+
+The API guarantees deterministic results:
+
+**Request 1:**
+```
+Input: document.pdf
+Output: [Event A, Event B, Event C]
+```
+
+**Request 2 (same file):**
+```
+Input: document.pdf
+Output: [Event A, Event B, Event C]
+```
+
+**Request 3 (same file):**
+```
+Input: document.pdf
+Output: [Event A, Event B, Event C]
+```
+
+✓ All three requests return identical results (byte-for-byte identical JSON)
+
+## Supported Date Formats
+
+The API recognizes and extracts dates in these formats:
+
+### Numeric Formats
+- ISO: `2024-01-15`, `2024/01/15`
+- US: `01/15/2024`, `1/15/2024`, `01-15-2024`
+- EU: `15/01/2024`, `15-01-2024`
+
+### Written Formats
+- Full month: `January 15, 2024`, `15 January 2024`, `January 15 2024`
+- Abbreviated: `Jan. 15, 2024`, `Jan 15, 2024`, `15 Jan 2024`
+- Short: `Jan. 15 2024`, `15 Jan. 2024`
+
+### Examples of Recognized Dates
+✓ `2024-01-15`
+✓ `01/15/2024`
+✓ `15-01-2024`
+✓ `January 15, 2024`
+✓ `15 January 2024`
+✓ `Jan. 15, 2024`
+✓ `15 Jan 2024`
+
+### Examples of Unrecognized Dates (returned as unclassified)
+✗ `Janua 15, 2024` (typo)
+✗ `Q1 2024` (quarter, not specific date)
+✗ `2024` (year only)
+✗ `Jan-24` (month-year only)
+
+## Integration with Frontend Component
+
+The React component expects events array in this format:
+
+```typescript
+interface TimelineEvent {
+  id: string;
+  eventName: string;
+  date: string;
+  eventType: string;
+  context?: string;
+  lineNumber?: number;
+}
+
+// Usage in component:
+<CaseTimeline events={apiResponse.events} />
+```
+
+The API response can be passed directly to the component:
+
+```typescript
+const { events } = await fetch('/api/analysis/timeline').then(r => r.json());
+<CaseTimeline events={events} />
+```
+
+## Error Handling Best Practices
+
+```typescript
+try {
+  const resp = await fetch('/api/analysis/timeline', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!resp.ok) {
+    const contentType = resp.headers.get('content-type') || '';
+    let errMsg = `HTTP ${resp.status}`;
+    
+    try {
+      if (contentType.includes('application/json')) {
+        const data = await resp.json();
+        errMsg = data?.message || data?.error || JSON.stringify(data);
+      } else {
+        errMsg = await resp.text();
+      }
+    } catch {
+      errMsg = await resp.text().catch(() => errMsg);
+    }
+    
+    throw new Error(errMsg);
+  }
+
+  const data = await resp.json();
+  
+  if (data.events.length === 0) {
+    console.warn('No events found');
+  }
+  
+  return data.events;
+} catch (error) {
+  console.error('Timeline analysis failed:', error);
+  // Show user-friendly error message
+}
+```
+
+## Caching Considerations
+
+The backend caches results per document session. Subsequent requests for the same document will:
+- Use cached timeline data
+- Return faster (immediate)
+- Produce identical results
+
+Cache is cleared when:
+- New file is uploaded
+- Server restarts
+- Session expires
+
+## Testing the API
+
+### Using Postman
+
+1. Create new POST request to `http://localhost:3000/api/analysis/timeline`
+2. Select "Body" → "form-data"
+3. Add field "file" as "File" type
+4. Select a PDF file
+5. Send request
+6. View response
+
+### Using Browser DevTools
+
+Open case analysis page, open DevTools Network tab:
+1. Upload PDF and generate summary
+2. Click "Generate Timeline" button
+3. In Network tab, find `timeline` request
+4. View Response tab to see JSON
+5. View Preview tab for formatted view
+
+## Common Response Patterns
+
+### Typical Court Case Timeline
+```json
+{
+  "events": [
+    {"id": "2024-01-15_1", "eventType": "filing", ...},
+    {"id": "2024-03-20_1", "eventType": "hearing", ...},
+    {"id": "2024-06-10_1", "eventType": "interim", ...},
+    {"id": "2024-12-05_1", "eventType": "judgment", ...}
+  ]
+}
+```
+
+### Contract Timeline
+```json
+{
+  "events": [
+    {"id": "2023-01-01_1", "eventType": "settlement", ...},
+    {"id": "2023-06-01_1", "eventType": "other", ...},
+    {"id": "2024-01-01_1", "eventType": "settlement", ...}
+  ]
+}
+```
+
+### Complex Litigation
+```json
+{
+  "events": [
+    {"id": "2022-06-15_1", "eventType": "filing", ...},
+    {"id": "2022-09-20_1", "eventType": "hearing", ...},
+    {"id": "2023-01-10_1", "eventType": "appeal", ...},
+    {"id": "2023-03-15_2", "eventType": "hearing", ...},
+    {"id": "2024-06-01_1", "eventType": "judgment", ...},
+    {"id": "2024-07-15_1", "eventType": "settlement", ...}
+  ]
+}
+```

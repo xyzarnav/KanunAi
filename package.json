@@ -14,5 +14,9 @@
   "description": "",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "vis-data": "^8.0.3",
+    "vis-timeline": "^8.3.1"
   }
 }

@@ -14,6 +14,9 @@ pypdf>=3.17.1
 # Environment variables
 python-dotenv>=1.0.0
 
+# Google Generative AI SDK (provides `google.generativeai` import)
+google-generative-ai>=0.4.0
+
 # Other utilities
 typing-extensions>=4.8.0
 requests>=2.31.0

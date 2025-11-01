@@ -1,8 +1,9 @@
 import type { Request, Response } from "express";
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs";
+import { spawn } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
 import dotenv from "dotenv";
+import crypto from "node:crypto";
 
 function getPythonExecutable(): string {
   if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
@@ -206,4 +207,249 @@ export async function chatQA(req: Request, res: Response) {
   }
 }
 
+export async function analyzeTimeline(req: Request, res: Response) {
+  try {
+    const file = (req as any).file as { path: string } | undefined;
 
+    if (!file) {
+      return res.status(400).json({ message: "Upload a PDF file to analyze timeline" });
+    }
+
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const outputDir = path.join(projectRoot, "ai-service", "src", "output");
+    
+    const cliPath = path.join(aiServiceDir, "timeline_cli.py");
+
+    const args: string[] = [cliPath, "--pdf", file.path, "--output", outputDir];
+
+    const pythonBin = getPythonExecutable();
+    const logPrefix = "[timeline-analyzer]";
+    console.log(`${logPrefix} python=`, pythonBin);
+    console.log(`${logPrefix} args=`, args.join(" "));
+
+    const child = spawn(pythonBin, args, {
+      cwd: aiServiceDir,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d.toString()));
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+
+    child.on("error", (err) => {
+      console.error(`${logPrefix}:spawn_error`, err);
+      return res.status(500).json({ message: "Failed to start Python process", error: err?.message || String(err) });
+    });
+
+    const timeoutMs = Number(process.env.SUMMARY_TIMEOUT_MS || 120000);
+    const timer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch {}
+    }, timeoutMs);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (file) {
+        try { fs.unlinkSync(file.path); } catch {}
+      }
+      
+      const exitCode = code ?? 1;
+      
+      if (exitCode !== 0) {
+        console.error(`${logPrefix}:FAILED Python exited with code`, exitCode);
+        if (stderr) console.error(`${logPrefix}:stderr`, stderr);
+        if (stdout) console.error(`${logPrefix}:stdout`, stdout);
+        return res.status(500).json({
+          message: "Timeline analysis failed",
+          code: exitCode,
+          stderr,
+          stdout
+        });
+      }
+      
+      if (!stdout || stdout.trim() === "") {
+        console.error(`${logPrefix}:FAILED No output from Python process`);
+        return res.status(500).json({
+          message: "Timeline analysis failed - no output",
+          code: exitCode,
+          stderr,
+          stdout: "(empty)"
+        });
+      }
+      
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        console.log(`${logPrefix}:parsed_result`, JSON.stringify(parsed, null, 2));
+        
+        if (!parsed.success) {
+          console.error(`${logPrefix}:not_successful`, parsed.error);
+          return res.status(400).json({
+            message: "No dates found in document",
+            error: parsed.error,
+            events: []
+          });
+        }
+        
+        const eventCount = parsed.events?.length || 0;
+        console.log(`${logPrefix}:returning_events`, eventCount);
+        
+        if (eventCount === 0) {
+          console.warn(`${logPrefix}:no_events_found`);
+        }
+        
+        return res.json({
+          events: parsed.events || [],
+          summary: parsed.summary || {}
+        });
+      } catch (e) {
+        console.error(`${logPrefix}:parse_error`, e);
+        console.error(`${logPrefix}:stdout`, stdout);
+        console.error(`${logPrefix}:stderr`, stderr);
+        return res.status(500).json({ message: "Invalid timeline output", raw: stdout, stderr });
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
+  }
+}
+
+export async function refactorTimeline(req: Request, res: Response) {
+  try {
+    const { context, parsed_date, maxLength = 3 } = req.body;
+
+    if (!context) {
+      return res.status(400).json({ message: "Context is required" });
+    }
+
+    // Simple in-memory cache to avoid repeated identical refactor requests
+    // Keyed by sha1(contextJSON) - keeps results for short-lived dev server lifetime
+    // Note: persistent cache (redis) is recommended for production
+    const refactorCache: Map<string, any> = (global as any).__REFRACTOR_CACHE ||= new Map();
+
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const cliPath = path.join(aiServiceDir, "refactor_timeline_cli.py");
+
+    // Load ai-service .env for GEMINI_API_KEY
+    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
+
+    const pythonBin = getPythonExecutable();
+    const logPrefix = "[refactor-timeline]";
+
+    console.log(`${logPrefix} Refactoring context for date: ${parsed_date}...`);
+
+    // Normalize context into a timeline array. The frontend may send:
+    // - a raw array of events
+    // - an object { events: [...] }
+    // - or a string (already serialized)
+    let timeline: any[] = [];
+    try {
+      if (Array.isArray(context)) {
+        timeline = context;
+      } else if (typeof context === 'object' && context !== null) {
+        if (Array.isArray(context.events)) timeline = context.events;
+        else if (Array.isArray((context as any).timeline)) timeline = (context as any).timeline;
+        else timeline = [context];
+      } else if (typeof context === 'string') {
+        // Try to parse JSON string
+        const parsedString = JSON.parse(context);
+        if (Array.isArray(parsedString)) timeline = parsedString;
+        else if (Array.isArray(parsedString.events)) timeline = parsedString.events;
+        else if (Array.isArray(parsedString.timeline)) timeline = parsedString.timeline;
+        else timeline = [parsedString];
+      }
+    } catch (e) {
+      // Fall back to wrapping raw string as single event
+      timeline = [{ summary: String(context) }];
+    }
+
+    // If empty timeline, respond early
+    if (!timeline || timeline.length === 0) {
+      return res.status(400).json({ message: 'No timeline events to refactor', events: [] });
+    }
+
+    // Compute cache key
+    const cacheKey = crypto.createHash('sha1').update(JSON.stringify({ timeline, parsed_date, maxLength })).digest('hex');
+    if (refactorCache.has(cacheKey)) {
+      console.log(`${logPrefix} cache hit for key ${cacheKey}`);
+      return res.json({ refactored: refactorCache.get(cacheKey), original: context, parsed_date });
+    }
+
+    return new Promise((resolve) => {
+      const pythonProcess = spawn(pythonBin, [cliPath], {
+        cwd: aiServiceDir,
+        env: { ...process.env },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      pythonProcess.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+
+      pythonProcess.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      pythonProcess.on("close", (exitCode) => {
+        if (exitCode !== 0) {
+          console.error(`${logPrefix} Python failed with code`, exitCode);
+          if (stderr) console.error(`${logPrefix} stderr:`, stderr);
+          // If the Python process failed due to rate limiting or external API errors,
+          // fall back to returning the original context but do not cache the failure.
+          return resolve(res.status(500).json({
+            message: "Refactoring failed",
+            error: stderr,
+            refactored: context // Fallback to original
+          }));
+        }
+
+        if (!stdout) {
+          console.error(`${logPrefix} No output from Python`);
+          return resolve(res.status(500).json({
+            message: "No output",
+            refactored: context // Fallback to original
+          }));
+        }
+
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          const refactored = parsed.refactored || parsed.timeline || parsed || context;
+          console.log(`${logPrefix} Success, refactored length:`, Array.isArray(refactored) ? refactored.length : (String(refactored).length));
+
+          // Cache successful refactor for short-term reuse
+          try { refactorCache.set(cacheKey, refactored); } catch {}
+
+          return resolve(res.json({
+            refactored,
+            original: context,
+            parsed_date: parsed_date  // Echo back date
+          }));
+        } catch (e) {
+          console.error(`${logPrefix} Parse error:`, e);
+          // Return original context as fallback
+          return resolve(res.json({
+            refactored: context, // Fallback
+            error: "Parse error"
+          }));
+        }
+      });
+
+      // Write JSON input to Python CLI including parsed_date
+      // Pass the normalized timeline array so the Python CLI will process all events in one batch
+      pythonProcess.stdin.write(JSON.stringify({
+        timeline,
+        parsed_date,  // NEW: Pass the parsed date
+        maxLength
+      }));
+      pythonProcess.stdin.end();
+    });
+  } catch (error) {
+    console.error("[refactor-timeline] Error:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+}

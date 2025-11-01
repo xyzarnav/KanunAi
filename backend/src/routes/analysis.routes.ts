@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import { summarizeCase, initQA, chatQA } from "../controllers/analysis.controller.js";
+import { summarizeCase, initQA, chatQA, analyzeTimeline, refactorTimeline } from "../controllers/analysis.controller.js";
 
 const router = Router();
 
@@ -30,6 +30,12 @@ router.post("/init-qa", (req, res, next) => {
 
 // Chat endpoint
 router.post("/chat", chatQA);
+
+// Timeline analysis endpoint
+router.post("/timeline", upload.single("file"), analyzeTimeline);
+
+// Refactor timeline context endpoint
+router.post("/refactor-timeline", refactorTimeline);
 
 export default router;
 

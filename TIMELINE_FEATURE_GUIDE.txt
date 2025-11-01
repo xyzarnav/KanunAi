@@ -1,0 +1,258 @@
+# Timeline Analysis Feature - Implementation Guide
+
+## Overview
+A comprehensive timeline analysis visualization feature has been successfully implemented for the KanunAI legal document analysis tool. This feature automatically extracts all dates from uploaded legal documents and creates an interactive, deterministic timeline visualization.
+
+## Components Created
+
+### 1. **Python Backend - Timeline Analyzer**
+**File:** `ai-service/src/models/timeline_analyzer.py`
+
+**Features:**
+- **Date Extraction**: Comprehensive regex patterns for multiple date formats:
+  - ISO format (2024-01-15)
+  - US format (01/15/2024, 01-15-2024)
+  - EU format (15/01/2024, 15-01-2024)
+  - Written dates (January 15, 2024 / 15 January 2024)
+  - Abbreviated formats (Jan. 15, 2024)
+
+- **Event Classification**: Automatically classifies events by type:
+  - `filing` (blue) - Filing dates, submissions
+  - `hearing` (orange) - Hearings, trials, oral arguments
+  - `judgment` (green) - Judgments, verdicts, decisions
+  - `appeal` (purple) - Appeals, revisions, writ petitions
+  - `settlement` (cyan) - Settlements, agreements
+  - `dismissal` (red) - Dismissals, withdrawals
+  - `interim` (amber) - Interim orders, stays, injunctions
+  - `adjournment` (slate) - Adjournments, postponements
+  - `other` (gray) - Miscellaneous events
+
+- **Deterministic Output**: 
+  - All dates are sorted chronologically
+  - Multiple events on same date get incremental IDs
+  - Events are sorted by line number for consistency
+  - Same document processed multiple times yields identical results
+
+- **Caching**: Extracted dates are cached per document
+
+### 2. **Timeline CLI Interface**
+**File:** `ai-service/src/models/timeline_cli.py`
+
+- Wraps TimelineAnalyzer for backend integration
+- Takes PDF path as argument
+- Returns JSON with events, summary statistics, and date ranges
+- Handles error cases gracefully
+
+### 3. **Backend API Endpoint**
+**File:** `backend/src/controllers/analysis.controller.ts`
+**Route:** `POST /api/analysis/timeline`
+
+```typescript
+export async function analyzeTimeline(req: Request, res: Response)
+```
+
+**Request:**
+- Multipart form data with PDF file upload
+
+**Response:**
+```json
+{
+  "events": [
+    {
+      "id": "2024-01-15_1",
+      "eventName": "Filing",
+      "date": "2024-01-15",
+      "eventType": "filing",
+      "context": "Petition filed on 15 January 2024",
+      "lineNumber": 42
+    },
+    ...
+  ],
+  "summary": {
+    "total_events": 12,
+    "event_types": {
+      "filing": 2,
+      "hearing": 3,
+      "judgment": 1,
+      ...
+    },
+    "date_range": {
+      "start": "2024-01-15",
+      "end": "2024-12-20"
+    }
+  }
+}
+```
+
+### 4. **React Timeline Component**
+**File:** `frontend/src/components/case-analysis/CaseTimeline.tsx`
+
+**Features:**
+
+- **Interactive Visualization:**
+  - SVG-based timeline rendering
+  - Color-coded event types
+  - Connection lines between events and timeline
+  - Alternating event positions (above/below timeline)
+
+- **User Interactions:**
+  - **Zoom**: Scroll wheel to zoom in/out (0.5x to 3x)
+  - **Pan**: Click and drag to move timeline
+  - **Reset**: Button to reset zoom and pan
+  - **Hover**: Tooltips show event context and line number
+  - **Keyboard Support**: Arrow keys for panning, +/- for zoom
+
+- **Statistics:**
+  - Total event count
+  - Year range display
+  - Event type legend with counts
+  - Deterministic sorting for consistent rendering
+
+- **Responsive Design:**
+  - Full-width timeline canvas
+  - Legend adapts to screen size
+  - Maintains aspect ratio on zoom
+
+### 5. **Frontend Integration**
+**File:** `frontend/src/app/case-analysis/page.tsx`
+
+**New Features:**
+- "Generate Timeline" button appears after document analysis
+- Timeline view replaces summary view when active
+- "Back to Summary" button to return to analysis view
+- Timeline loading state with spinner
+- Event error handling and user feedback
+
+**State Management:**
+```typescript
+const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+const [showTimeline, setShowTimeline] = useState(false);
+const [timelineLoading, setTimelineLoading] = useState(false);
+```
+
+## How It Works
+
+### Step 1: Upload Document
+1. User uploads a PDF legal document via drag-and-drop or file picker
+2. Document is analyzed for case summary
+
+### Step 2: Generate Timeline
+1. After summary is complete, "Generate Timeline" button appears
+2. Click button to extract dates and generate timeline
+3. Timeline analyzer processes the PDF:
+   - Loads PDF text
+   - Extracts all dates using regex patterns
+   - Classifies events by type and context
+   - Sorts events chronologically
+   - Caches results per document
+
+### Step 3: Visualize Timeline
+1. Interactive timeline displays with:
+   - Central horizontal line representing time flow
+   - Color-coded event circles on the timeline
+   - Event boxes above/below timeline
+   - Connection lines linking events to timeline
+   - Legend showing event type distribution
+
+### Step 4: Interact with Timeline
+- **Zoom**: Scroll wheel up/down to zoom in/out
+- **Pan**: Click and drag to move around
+- **Reset**: Click reset button to return to original view
+- **Inspect**: Hover over events to see full context and line number
+
+## Deterministic Properties
+
+All timeline outputs are fully deterministic:
+
+1. **Date Sorting**: Events are sorted strictly by date, then by line number
+2. **Event IDs**: Format `YYYY-MM-DD_N` where N is incremental for same-day events
+3. **Classification**: Same keywords always map to same event types
+4. **Caching**: Same document always produces identical timeline
+
+## Color Coding
+
+| Event Type | Color | Hex Value |
+|-----------|-------|-----------|
+| Filing | Blue | #3B82F6 |
+| Hearing | Orange | #F97316 |
+| Judgment | Green | #22C55E |
+| Appeal | Purple | #A855F7 |
+| Settlement | Cyan | #06B6D4 |
+| Dismissal | Red | #EF4444 |
+| Interim | Amber | #F59E0B |
+| Adjournment | Slate | #64748B |
+| Other | Gray | #6B7280 |
+
+## Error Handling
+
+- **No dates found**: User-friendly message "No dates found in the document"
+- **Invalid PDF**: Returns error from backend with clear message
+- **Network errors**: Graceful fallback with user-facing error
+- **Timeout**: Handled with appropriate status codes
+
+## Performance
+
+- **Date extraction**: O(n) where n = document lines
+- **Event sorting**: O(m log m) where m = extracted dates
+- **Rendering**: Efficient SVG with CSS transforms for zoom/pan
+- **Memory**: Cached results per document ID
+
+## Future Enhancements
+
+1. **Advanced Features**:
+   - Export timeline as image/PDF
+   - Download timeline data as CSV
+   - Custom date range filtering
+   - Event search/filter functionality
+
+2. **Improvements**:
+   - ML-based date confidence scoring
+   - Multi-language date format support
+   - Relationship mapping between events
+   - Timeline comparison for multiple documents
+
+3. **Integration**:
+   - Sync with case metadata
+   - Timeline annotations by users
+   - Real-time collaborative editing
+
+## Technical Stack
+
+- **Backend**: Node.js/Express, TypeScript, Python
+- **Frontend**: React 19, Next.js, TypeScript, Tailwind CSS
+- **Visualization**: SVG with canvas interactions
+- **Date Processing**: Python regex, LangChain for PDF loading
+- **State Management**: React hooks
+
+## Files Modified/Created
+
+**New Files:**
+- `ai-service/src/models/timeline_analyzer.py`
+- `ai-service/src/models/timeline_cli.py`
+- `frontend/src/components/case-analysis/CaseTimeline.tsx`
+
+**Modified Files:**
+- `backend/src/controllers/analysis.controller.ts` (added analyzeTimeline function)
+- `backend/src/routes/analysis.routes.ts` (added timeline route)
+- `frontend/src/app/case-analysis/page.tsx` (integrated timeline UI)
+
+## Testing & Validation
+
+To test the timeline feature:
+
+1. **Upload a legal document** with multiple dates (case files, contracts, court orders)
+2. **Generate summary** to complete initial analysis
+3. **Click "Generate Timeline"** to extract and visualize dates
+4. **Interact with timeline**:
+   - Scroll to zoom
+   - Drag to pan
+   - Hover to see event details
+   - Click reset to return to original view
+5. **Verify determinism**: Upload same document again, timeline should be identical
+
+## Notes
+
+- Timeline is cached per document session
+- Supports any PDF with extractable text
+- Date accuracy depends on document text quality
+- OCR documents may have lower accuracy if text was recognized poorly
