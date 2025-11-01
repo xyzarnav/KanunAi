@@ -41,10 +41,10 @@ export default function CaseTimeline({ parsedResult = { events: [] } }: CaseTime
 
   // Extract summary from event - prioritize refactored summary from Gemini
   const extractSummary = (event: TimelineEvent): string[] => {
-    // First priority: Use the summary field from refactored events (2-line summary from Gemini)
+    // First priority: Use the summary field from refactored events (2-4 line summary from Gemini)
     if (event.summary) {
-      // Split summary into lines, ensuring max 2 lines
-      const lines = event.summary.split('\n').filter(line => line.trim()).slice(0, 2);
+      // Split summary into lines, allowing 2-4 lines for detailed summaries
+      const lines = event.summary.split('\n').filter(line => line.trim()).slice(0, 4);
       return lines.length > 0 ? lines : [];
     }
     

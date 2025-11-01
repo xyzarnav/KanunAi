@@ -171,7 +171,7 @@ export default function ContractInputPanel({
           )}
         </div>
 
-        {/* Analysis Focus Areas */}
+        {/* Analysis Focus Areas
         <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
           <div className="block mb-4">
             <span className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
@@ -201,7 +201,7 @@ export default function ContractInputPanel({
               );
             })}
           </div>
-        </div>
+        </div> */}
 
         {/* Contract Description
         <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800">
