@@ -747,6 +747,8 @@ export default function CaseTimeline({ parsedResult = { events: [] } }: CaseTime
 
 
 
+      {/* Timeline Events Section - Commented out as requested */}
+      {/* 
       <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline Events</h3>
         <div className="space-y-4">
@@ -797,6 +799,7 @@ export default function CaseTimeline({ parsedResult = { events: [] } }: CaseTime
           })}
         </div>
       </div>
+      */}
 
       <div className="flex items-center justify-between text-sm text-gray-500 px-4">
         <div>Total Events: {sortedEvents.length}</div>
