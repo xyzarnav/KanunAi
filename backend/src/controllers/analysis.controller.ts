@@ -208,11 +208,53 @@ export async function chatQA(req: Request, res: Response) {
 }
 
 export async function analyzeTimeline(req: Request, res: Response) {
+  let responseSent = false;
+  let timer: NodeJS.Timeout | null = null;
+  let filePath: string | null = null;
+  
+  const sendResponse = (status: number, data: any) => {
+    if (responseSent) {
+      console.warn("[timeline-analyzer]: Response already sent, ignoring duplicate response");
+      return;
+    }
+    responseSent = true;
+    if (timer) clearTimeout(timer);
+    
+    // Cleanup file after a short delay to ensure it's not in use
+    if (filePath) {
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (cleanupErr) {
+          // Ignore cleanup errors
+        }
+      }, 1000);
+    }
+    
+    res.status(status).json(data);
+  };
+
   try {
     const file = (req as any).file as { path: string } | undefined;
 
     if (!file) {
-      return res.status(400).json({ message: "Upload a PDF file to analyze timeline" });
+      return sendResponse(400, { message: "Upload a PDF file to analyze timeline" });
+    }
+
+    filePath = file.path;
+
+    // Verify file exists and is readable
+    try {
+      if (!fs.existsSync(filePath)) {
+        return sendResponse(400, { message: "Uploaded file not found" });
+      }
+      // Try to access file to ensure it's readable
+      fs.accessSync(filePath, fs.constants.R_OK);
+    } catch (fileErr: any) {
+      console.error("[timeline-analyzer]: File access error", fileErr);
+      return sendResponse(400, { message: "Cannot access uploaded file", error: fileErr?.message });
     }
 
     const projectRoot = path.resolve(process.cwd(), "..");
@@ -221,7 +263,12 @@ export async function analyzeTimeline(req: Request, res: Response) {
     
     const cliPath = path.join(aiServiceDir, "timeline_cli.py");
 
-    const args: string[] = [cliPath, "--pdf", file.path, "--output", outputDir];
+    // Verify CLI script exists
+    if (!fs.existsSync(cliPath)) {
+      return sendResponse(500, { message: "Timeline analysis service not available", error: "CLI script not found" });
+    }
+
+    const args: string[] = [cliPath, "--pdf", filePath, "--output", outputDir];
 
     const pythonBin = getPythonExecutable();
     const logPrefix = "[timeline-analyzer]";
@@ -236,60 +283,87 @@ export async function analyzeTimeline(req: Request, res: Response) {
 
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
+    let processEnded = false;
 
-    child.on("error", (err) => {
-      console.error(`${logPrefix}:spawn_error`, err);
-      return res.status(500).json({ message: "Failed to start Python process", error: err?.message || String(err) });
+    child.stdout.on("data", (d) => {
+      stdout += d.toString();
     });
 
-    const timeoutMs = Number(process.env.SUMMARY_TIMEOUT_MS || 120000);
-    const timer = setTimeout(() => {
-      try { child.kill('SIGKILL'); } catch {}
+    child.stderr.on("data", (d) => {
+      stderr += d.toString();
+    });
+
+    child.on("error", (err) => {
+      if (processEnded) return;
+      processEnded = true;
+      console.error(`${logPrefix}:spawn_error`, err);
+      sendResponse(500, { 
+        message: "Failed to start Python process", 
+        error: err?.message || String(err) 
+      });
+    });
+
+    const timeoutMs = Number(process.env.TIMELINE_TIMEOUT_MS || process.env.SUMMARY_TIMEOUT_MS || 180000); // 3 minutes default
+    timer = setTimeout(() => {
+      if (processEnded) return;
+      processEnded = true;
+      console.error(`${logPrefix}:TIMEOUT after ${timeoutMs}ms`);
+      try { 
+        child.kill('SIGKILL'); 
+      } catch (killErr) {
+        // Ignore kill errors
+      }
+      
+      // Wait a bit for process to die, then send timeout response
+      setTimeout(() => {
+        sendResponse(500, {
+          message: "Timeline analysis timed out",
+          error: `Process exceeded ${timeoutMs}ms timeout`,
+          stderr: stderr.substring(0, 500),
+          stdout: stdout.substring(0, 500)
+        });
+      }, 100);
     }, timeoutMs);
 
     child.on("close", (code) => {
-      clearTimeout(timer);
-      if (file) {
-        try { fs.unlinkSync(file.path); } catch {}
-      }
+      if (processEnded) return;
+      processEnded = true;
       
       const exitCode = code ?? 1;
       
-      if (exitCode !== 0) {
-        console.error(`${logPrefix}:FAILED Python exited with code`, exitCode);
-        if (stderr) console.error(`${logPrefix}:stderr`, stderr);
-        if (stdout) console.error(`${logPrefix}:stdout`, stdout);
-        return res.status(500).json({
-          message: "Timeline analysis failed",
-          code: exitCode,
-          stderr,
-          stdout
-        });
-      }
-      
+      // Try to parse even if exit code is non-zero (sometimes Python exits with non-zero but produces valid output)
       if (!stdout || stdout.trim() === "") {
-        console.error(`${logPrefix}:FAILED No output from Python process`);
-        return res.status(500).json({
+        console.error(`${logPrefix}:FAILED No output from Python process (exit code: ${exitCode})`);
+        if (stderr) console.error(`${logPrefix}:stderr`, stderr);
+        sendResponse(500, {
           message: "Timeline analysis failed - no output",
           code: exitCode,
-          stderr,
+          stderr: stderr.substring(0, 1000),
           stdout: "(empty)"
         });
+        return;
       }
       
       try {
-        const parsed = JSON.parse(stdout.trim());
+        // Try to extract JSON even if there's extra output
+        let jsonStr = stdout.trim();
+        // Find JSON object in output (in case there's debug output before/after)
+        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
+        }
+        
+        const parsed = JSON.parse(jsonStr);
         console.log(`${logPrefix}:parsed_result`, JSON.stringify(parsed, null, 2));
         
         if (!parsed.success) {
           console.error(`${logPrefix}:not_successful`, parsed.error);
-          return res.status(400).json({
+          sendResponse(400, {
             message: "No dates found in document",
             error: parsed.error,
             events: []
           });
+          return;
         }
         
         const eventCount = parsed.events?.length || 0;
@@ -299,19 +373,33 @@ export async function analyzeTimeline(req: Request, res: Response) {
           console.warn(`${logPrefix}:no_events_found`);
         }
         
-        return res.json({
+        sendResponse(200, {
           events: parsed.events || [],
           summary: parsed.summary || {}
         });
-      } catch (e) {
+      } catch (e: any) {
         console.error(`${logPrefix}:parse_error`, e);
-        console.error(`${logPrefix}:stdout`, stdout);
-        console.error(`${logPrefix}:stderr`, stderr);
-        return res.status(500).json({ message: "Invalid timeline output", raw: stdout, stderr });
+        console.error(`${logPrefix}:stdout (first 500 chars)`, stdout.substring(0, 500));
+        console.error(`${logPrefix}:stderr (first 500 chars)`, stderr.substring(0, 500));
+        
+        // If exit code is 0 but we can't parse, it's a parsing issue
+        // If exit code is non-zero, it's likely an execution error
+        sendResponse(500, { 
+          message: exitCode === 0 ? "Invalid timeline output format" : "Timeline analysis failed",
+          error: e?.message || String(e),
+          raw: stdout.substring(0, 1000),
+          stderr: stderr.substring(0, 1000),
+          code: exitCode
+        });
       }
     });
   } catch (err: any) {
-    return res.status(500).json({ message: "Server error", error: err?.message || String(err) });
+    if (!responseSent) {
+      sendResponse(500, { 
+        message: "Server error", 
+        error: err?.message || String(err) 
+      });
+    }
   }
 }
 
