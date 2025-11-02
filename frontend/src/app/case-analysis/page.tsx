@@ -455,6 +455,7 @@ export default function CaseAnalysis() {
                       <th className="px-4 py-3 text-left font-semibold text-sm">Case Name</th>
                       <th className="px-4 py-3 text-left font-semibold text-sm">Court</th>
                       <th className="px-4 py-3 text-left font-semibold text-sm">Year</th>
+                      <th className="px-4 py-3 text-left font-semibold text-sm">Case Description</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -468,6 +469,7 @@ export default function CaseAnalysis() {
                         <td className="px-4 py-3 text-gray-900 font-medium">{precedent.caseName}</td>
                         <td className="px-4 py-3 text-gray-700">{precedent.court}</td>
                         <td className="px-4 py-3 text-gray-700">{precedent.year}</td>
+                        <td className="px-4 py-3 text-gray-700">{precedent.similarityReason}</td>
                       </tr>
                     ))}
                   </tbody>
