@@ -1429,6 +1429,34 @@ class TimelineAnalyzer:
                 cache_file = Path(output_dir) / f"{Path(pdf_path).stem}_timeline.json"
                 with open(cache_file, 'w', encoding='utf-8') as f:
                     json.dump(result, f, indent=2, default=str)
+                
+                # Generate diagrams
+                try:
+                    from .diagram_generator import DiagramGenerator
+                    generator = DiagramGenerator(cache_dir=str(output_dir))
+                    
+                    # Generate event distribution diagram
+                    base_name = Path(pdf_path).stem
+                    dist_file = generator.generate_timeline_event_distribution(
+                        events, 
+                        filename=f"{base_name}_event_distribution.png"
+                    )
+                    
+                    # Generate timeline visualization
+                    timeline_file = generator.generate_timeline_visualization(
+                        events,
+                        filename=f"{base_name}_timeline.png"
+                    )
+                    
+                    # Add diagram paths to result
+                    result['diagrams'] = {
+                        'event_distribution': dist_file,
+                        'timeline_visualization': timeline_file
+                    }
+                except Exception as e:
+                    print(f"[timeline-analyzer] Warning: Could not generate diagrams: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             return result
         

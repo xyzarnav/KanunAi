@@ -235,7 +235,7 @@ export default function ChatBot({ session }: Readonly<ChatBotProps>) {
                                         {/* AI Avatar */}
                                         <div className="flex-shrink-0 pt-1">
                                             <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                                                AI
+                                                kAI
                                             </div>
                                         </div>
                                         {/* AI Message Bubble */}
