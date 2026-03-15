@@ -102,7 +102,7 @@ export default function CaseAnalysis() {
       alert('Please upload a file or provide a legal issue description');
       return;
     }
-    
+
     // Auto-generate case title from filename if not provided and file is uploaded
     let finalCaseTitle = caseTitle.trim();
     if (!finalCaseTitle && uploadedFile) {
@@ -148,9 +148,9 @@ export default function CaseAnalysis() {
       const sess = (data as unknown as { session?: string })?.session ?? null;
       setSummaryMd(summary);
       setSession(sess);
-      
+
       console.log('[CaseAnalysis] Summary completed, session:', sess);
-      
+
       if (sess) {
         // initialize QA in background
         try {
@@ -348,12 +348,12 @@ export default function CaseAnalysis() {
                   )}
                   <span>{timelineVisible ? 'Hide Timeline' : 'Show Timeline'}</span>
                 </button>
-                <button
+                {/* <button
                   onClick={() => setShowTimeline(false)}
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-lg transition-colors"
                 >
                   Back to Summary
-                </button>
+                </button> */}
               </div>
             </div>
             {timelineVisible && (
@@ -412,7 +412,7 @@ export default function CaseAnalysis() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <span>Precedent Search</span>
+                    <span>Similar Cases Search</span>
                   </>
                 )}
               </button>
@@ -443,10 +443,10 @@ export default function CaseAnalysis() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.011 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.011-9.963-7.178z" />
                   </svg>
                 )}
-                <span>{precedentsVisible ? 'Hide Precedents' : 'Show Precedents'}</span>
+                <span>{precedentsVisible ? 'Close Similar Search' : 'Similar Search'}</span>
               </button>
             </div>
-            
+
             {precedentsVisible && (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse bg-white rounded-lg overflow-hidden">
@@ -462,9 +462,8 @@ export default function CaseAnalysis() {
                     {precedents.map((precedent, index) => (
                       <tr
                         key={index}
-                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        }`}
+                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          }`}
                       >
                         <td className="px-4 py-3 text-gray-900 font-medium">{precedent.caseName}</td>
                         <td className="px-4 py-3 text-gray-700">{precedent.court}</td>
@@ -481,10 +480,10 @@ export default function CaseAnalysis() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start relative">
           {(() => {
-            console.log('[CaseAnalysis] Render check:', { 
-              summaryMd: !!summaryMd, 
-              chatReady, 
-              session: !!session 
+            console.log('[CaseAnalysis] Render check:', {
+              summaryMd: !!summaryMd,
+              chatReady,
+              session: !!session
             });
             return summaryMd && chatReady && session ? (
               <ChatBot session={session} />
