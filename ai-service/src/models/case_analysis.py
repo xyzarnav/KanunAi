@@ -768,7 +768,7 @@ Answer:""",
             if genai and self.api_key:
                 try:
                     genai.configure(api_key=self.api_key)
-                    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     
                     prompt = f"""You are a Supreme Court case expert. Answer based on the judgment context provided.
 

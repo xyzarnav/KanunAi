@@ -47,7 +47,7 @@ def search_precedents(summary: str) -> list:
     try:
         # Initialize Gemini
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""You are a legal research assistant. Based on the following case summary, find and list the top 5 most relevant legal precedents (cases) from Indian courts.
 
