@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface TimelineEvent {
   readonly id: string;
@@ -9,6 +9,7 @@ interface TimelineEvent {
   readonly eventType: string;
   readonly context?: string;
   readonly summary?: string;
+  readonly lineNumber?: number;
 }
 
 interface CustomTimelineProps {
@@ -57,6 +58,53 @@ export default function CustomTimeline({
   extractSummary,
   formatDateForDisplay,
 }: CustomTimelineProps) {
+
+  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Refined context cache: eventId -> refined text
+  const [refinedContexts, setRefinedContexts] = useState<Record<string, string>>({});
+  const [refiningIds, setRefiningIds] = useState<Set<string>>(new Set());
+
+  // Find the hovered event
+  const hoveredEvent = hoveredEventId ? events.find(e => e.id === hoveredEventId) : null;
+
+  // Get all events that share the same date as the hovered event
+  const getAllEventsForDate = (dateStr: string) => {
+    return events.filter(e => e.date === dateStr);
+  };
+
+  // Auto-refine context when popup opens
+  useEffect(() => {
+    if (!hoveredEvent) return;
+    const dateEvents = events.filter(e => e.date === hoveredEvent.date);
+    // Refine each event's context that hasn't been refined yet
+    dateEvents.forEach((evt) => {
+      if (!evt.context || refinedContexts[evt.id] || refiningIds.has(evt.id)) return;
+      setRefiningIds(prev => new Set(prev).add(evt.id));
+      fetch('/api/analysis/refine-context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          context: evt.context,
+        }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.refined) {
+            setRefinedContexts(prev => ({ ...prev, [evt.id]: data.refined }));
+          }
+        })
+        .catch(() => { /* silently fail, show raw context */ })
+        .finally(() => {
+          setRefiningIds(prev => {
+            const next = new Set(prev);
+            next.delete(evt.id);
+            return next;
+          });
+        });
+    });
+  }, [hoveredEvent?.date]);
 
   if (!events || events.length === 0) {
     return (
@@ -170,7 +218,38 @@ export default function CustomTimeline({
   };
 
   return (
-    <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden timeline-container">
+    <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-visible timeline-container" style={{ position: 'relative' }}>
+      {/* Popup animation styles */}
+      <style>{`
+        @keyframes popupFadeIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+        @keyframes backdropFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .popup-overlay-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .popup-overlay-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 3px;
+        }
+        .popup-overlay-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+        .popup-overlay-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
       <div className="p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Legal Case Timeline</h2>
         
@@ -276,11 +355,20 @@ export default function CustomTimeline({
                         className="flex flex-col items-center relative"
                         style={{
                           width: `${EVENT_CARD_WIDTH}px`,
+                          cursor: 'pointer',
                         }}
+                        onMouseEnter={() => setHoveredEventId(event.id)}
+                        onMouseLeave={() => setHoveredEventId(null)}
                       >
                         {/* Date marker above line */}
-                        <div className="mb-2 relative z-10">
-                          <div className="px-3 py-1 bg-white border-2 border-gray-600 rounded-md text-xs font-semibold text-gray-800 whitespace-nowrap shadow-sm">
+                        <div className="mb-2 relative z-20">
+                          <div 
+                            className={`px-3 py-1 bg-white border-2 rounded-md text-xs font-semibold text-gray-800 whitespace-nowrap shadow-sm transition-all duration-200 ${
+                              hoveredEventId === event.id 
+                                ? 'border-blue-500 shadow-md bg-blue-50' 
+                                : 'border-gray-600'
+                            }`}
+                          >
                             {formattedDate}
                           </div>
                         </div>
@@ -289,16 +377,18 @@ export default function CustomTimeline({
                         <div
                           className="w-0.5 bg-gray-400 relative z-0"
                           style={{
-                            height: `${VERTICAL_CONNECTOR_HEIGHT}px`, // Height to reach timeline below cards
+                            height: `${VERTICAL_CONNECTOR_HEIGHT}px`,
                             marginBottom: '2px',
                           }}
                         />
 
                         {/* Event details box */}
                         <div
-                          className="bg-white border-2 rounded-lg shadow-lg p-3"
+                          className={`bg-white border-2 rounded-lg shadow-lg p-3 transition-all duration-200 ${
+                            hoveredEventId === event.id ? 'shadow-xl ring-2 ring-blue-200' : ''
+                          }`}
                           style={{
-                            borderColor: categoryColor,
+                            borderColor: hoveredEventId === event.id ? '#3b82f6' : categoryColor,
                             width: `${EVENT_CARD_WIDTH}px`,
                             minHeight: `${EVENT_CARD_HEIGHT}px`,
                           }}
@@ -347,7 +437,7 @@ export default function CustomTimeline({
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Categories Summary</h3>
           <div className="grid grid-cols-2 gap-4">
             {Array.from(categorizedEvents.entries())
-              .sort((a, b) => b[1].length - a[1].length) // Sort by count descending
+              .sort((a, b) => b[1].length - a[1].length)
               .map(([category, categoryEvents]) => {
                 const categoryColor = getCategoryColor(category);
                 return (
@@ -372,6 +462,193 @@ export default function CustomTimeline({
           </div>
         </div>
       </div>
+
+      {/* ===== CENTERED OVERLAY POPUP ===== */}
+      {hoveredEvent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9998,
+            background: 'rgba(0, 0, 0, 0.35)',
+            animation: 'backdropFadeIn 0.15s ease-out',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {hoveredEvent && (() => {
+        const dateEvents = getAllEventsForDate(hoveredEvent.date);
+        const displayDate = formatDateForDisplay(hoveredEvent.date);
+        return (
+          <div
+            ref={popupRef}
+            className="popup-overlay-scrollbar"
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '840px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              zIndex: 9999,
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '32px',
+              boxShadow: '0 25px 80px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05)',
+              animation: 'popupFadeIn 0.2s ease-out forwards',
+              pointerEvents: 'auto',
+            }}
+            onMouseEnter={() => setHoveredEventId(hoveredEvent.id)}
+            onMouseLeave={() => setHoveredEventId(null)}
+          >
+            {/* Popup Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '24px',
+              paddingBottom: '16px',
+              borderBottom: '2px solid #e2e8f0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{
+                  fontSize: '14px',
+                  padding: '4px 14px',
+                  borderRadius: '999px',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  fontWeight: 700,
+                  letterSpacing: '0.3px',
+                  border: '1px solid #bfdbfe',
+                }}>
+                  📅 {displayDate}
+                </span>
+                <span style={{
+                  fontSize: '13px',
+                  color: '#64748b',
+                  fontWeight: 500,
+                }}>
+                  {dateEvents.length} event{dateEvents.length > 1 ? 's' : ''} on this date
+                </span>
+              </div>
+              <span style={{
+                fontSize: '11px',
+                color: '#94a3b8',
+                fontStyle: 'italic',
+              }}>
+                Hover to keep open
+              </span>
+            </div>
+
+            {/* Events List */}
+            {dateEvents.map((dateEvent, idx) => {
+              const evtCategory = categorizeEvent(dateEvent);
+              const evtColor = getCategoryColor(evtCategory);
+              return (
+                <div
+                  key={dateEvent.id}
+                  style={{
+                    marginBottom: idx < dateEvents.length - 1 ? '20px' : '0',
+                    paddingBottom: idx < dateEvents.length - 1 ? '20px' : '0',
+                    borderBottom: idx < dateEvents.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  }}
+                >
+                  {/* Event Name & Type */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      letterSpacing: '-0.3px',
+                    }}>
+                      {dateEvent.eventName}
+                    </span>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '2px 10px',
+                      borderRadius: '6px',
+                      background: evtColor + '20',
+                      color: '#334155',
+                      fontWeight: 600,
+                      border: `1px solid ${evtColor}66`,
+                    }}>
+                      {dateEvent.eventType}
+                    </span>
+                  </div>
+
+                  {/* Summary */}
+                  {dateEvent.summary && (
+                    <div style={{
+                      fontSize: '13px',
+                      color: '#475569',
+                      lineHeight: '1.7',
+                      marginBottom: '12px',
+                      padding: '10px 14px',
+                      background: '#f8fafc',
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${evtColor}`,
+                    }}>
+                      {dateEvent.summary}
+                    </div>
+                  )}
+
+                  {/* Context - Refined via Gemini AI */}
+                  {dateEvent.context && (
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#475569',
+                      lineHeight: '1.7',
+                      marginBottom: '10px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      padding: '12px 14px',
+                      background: '#f1f5f9',
+                      borderRadius: '8px',
+                      position: 'relative',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#334155', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          {refinedContexts[dateEvent.id] ? '✨ AI-Refined Context' : 'Context'}
+                        </span>
+                        {refiningIds.has(dateEvent.id) && (
+                          <span style={{ fontSize: '10px', color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ display: 'inline-block', width: '10px', height: '10px', border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            Refining with AI...
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: refinedContexts[dateEvent.id] ? '#1e293b' : '#64748b' }}>
+                        {refinedContexts[dateEvent.id] 
+                          ? refinedContexts[dateEvent.id]
+                          : dateEvent.context.replace(/PAGE BREAK/gi, '').replace(/---/g, '').trim()
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Line Number */}
+                  {dateEvent.lineNumber && (
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '6px',
+                    }}>
+                      <span>📄 Document Line: {dateEvent.lineNumber}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

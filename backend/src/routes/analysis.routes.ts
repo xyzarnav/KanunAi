@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import { summarizeCase, initQA, chatQA, analyzeTimeline, refactorTimeline, searchPrecedents } from "../controllers/analysis.controller.js";
+import { summarizeCase, initQA, chatQA, analyzeTimeline, refactorTimeline, refineContext, searchPrecedents } from "../controllers/analysis.controller.js";
 
 const router = Router();
 
@@ -34,8 +34,11 @@ router.post("/chat", chatQA);
 // Timeline analysis endpoint
 router.post("/timeline", upload.single("file"), analyzeTimeline);
 
-// Refactor timeline context endpoint
+// Refactor timeline context endpoint (shortening)
 router.post("/refactor-timeline", refactorTimeline);
+
+// Refine context endpoint (unvague-ing)
+router.post("/refine-context", refineContext);
 
 // Precedent search endpoint
 router.post("/precedent-search", searchPrecedents);

@@ -637,3 +637,68 @@ export async function searchPrecedents(req: Request, res: Response) {
     });
   }
 }
+
+export async function refineContext(req: Request, res: Response) {
+  try {
+    const { context } = req.body;
+
+    if (!context) {
+      return res.status(400).json({ message: "Context is required" });
+    }
+
+    const projectRoot = path.resolve(process.cwd(), "..");
+    const aiServiceDir = path.join(projectRoot, "ai-service", "src", "models");
+    const cliPath = path.join(aiServiceDir, "refine_context_cli.py");
+
+    dotenv.config({ path: path.join(projectRoot, "ai-service", ".env") });
+
+    const pythonBin = getPythonExecutable();
+    const logPrefix = "[refine-context]";
+
+    console.log(`${logPrefix} Refining context clarity...`);
+
+    const pythonProcess = spawn(pythonBin, [cliPath], {
+      cwd: aiServiceDir,
+      env: { ...process.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    pythonProcess.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    pythonProcess.on("close", (exitCode) => {
+      if (exitCode !== 0) {
+        console.error(`${logPrefix} Python failed with code`, exitCode);
+        return res.status(500).json({
+          message: "Refinement failed",
+          error: stderr,
+          refined: context // Fallback
+        });
+      }
+
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        const refined = parsed.refined || context;
+        return res.json({ refined });
+      } catch (e) {
+        console.error(`${logPrefix} Parse error:`, e);
+        return res.json({ refined: context });
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify({ context }));
+    pythonProcess.stdin.end();
+
+  } catch (error) {
+    console.error("[refine-context] Error:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
